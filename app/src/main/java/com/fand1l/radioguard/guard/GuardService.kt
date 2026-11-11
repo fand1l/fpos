@@ -188,11 +188,14 @@ class GuardService : Service() {
     }
 
     private suspend fun runGuard() {
-        GuardState.log(getString(R.string.log_guard_started))
+        var announced = false
         while (true) {
             val settings = readSettings()
             if (!settings.guardOn) break
-            wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
+            if (!announced) {
+                GuardState.log(getString(R.string.log_guard_started))
+                announced = true
+            }
             try {
                 tick(settings)
             } catch (e: ShellException) {
@@ -200,8 +203,6 @@ class GuardService : Service() {
                 if (describe(e) != shellError) GuardState.log(getString(R.string.log_error, describe(e)))
                 shellError = describe(e)
                 report(currentChecks(settings), shellProblem = describe(e))
-            } finally {
-                if (wakeLock.isHeld) wakeLock.release()
             }
             withTimeoutOrNull(TICK_MS) { wake.receive() }
             // Одна дія користувача дає кілька подій поспіль; чекаємо, поки стан устоїться.
@@ -257,6 +258,8 @@ class GuardService : Service() {
                 val message = if (firstLock) R.string.log_locking else R.string.log_violation
                 GuardState.log(getString(message, names(violations)))
             }
+            // Порушення міг помітити й таймер, без події. Тоді телефон ніщо не тримає від сну.
+            wakeLock.acquire(ENFORCE_WAKE_MS)
             enforce(violations, settings)
             delay(SETTLE_MS)
             runSlowCycle()
@@ -435,9 +438,13 @@ class GuardService : Service() {
         poke()
     }
 
-    /** Будить цикл і не дає телефону заснути, поки порушення не оброблено. */
+    /**
+     * Будить цикл і не дає телефону заснути, поки подію не оброблено.
+     * Блокування ніде не знімаємо вручну, воно спливає саме: так нова подія
+     * не може втратити його через те, що цикл саме закінчив попередню.
+     */
     private fun poke() {
-        wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
+        wakeLock.acquire(EVENT_WAKE_MS)
         wake.trySend(Unit)
     }
 
@@ -459,7 +466,8 @@ class GuardService : Service() {
         private const val SLOW_CYCLE_MS = 30_000L
         private const val MIN_PROBE_GAP_MS = 2_000L
         private const val CRASH_RESTART_MS = 3_000L
-        private const val WAKE_LOCK_TIMEOUT_MS = 30_000L
+        private const val EVENT_WAKE_MS = 10_000L
+        private const val ENFORCE_WAKE_MS = 30_000L
 
         /** false — система не дозволила запуск (застосунок у фоні). */
         fun start(context: Context): Boolean = try {

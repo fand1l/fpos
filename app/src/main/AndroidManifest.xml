@@ -62,6 +62,7 @@
              вимірювання швидкодії, а відкритих компонентів має бути якнайменше. -->
         <receiver
             android:name="androidx.profileinstaller.ProfileInstallReceiver"
+            tools:ignore="MissingClass"
             tools:node="remove" />
 
         <provider
