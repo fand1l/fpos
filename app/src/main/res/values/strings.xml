@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Радіо-вартовий</string>
+
+    <string name="channel_status">Стан вартового</string>
+    <string name="channel_alarm">Тривога</string>
+
+    <string name="status_starting">Режим тиші вмикається…</string>
+    <string name="status_ok">Режим тиші: усе вимкнено.</string>
+    <string name="status_violation">Режим тиші: є порушення.</string>
+    <string name="status_no_shell">Зв\'язок НЕ контролюється.</string>
+    <string name="status_restoring">Повертаю попередній стан…</string>
+
+    <string name="alarm_no_shell_title">Зв\'язок НЕ контролюється</string>
+    <string name="alarm_shizuku_not_installed">Shizuku не встановлено.</string>
+    <string name="alarm_shizuku_not_running">Shizuku не запущений. Запустіть його.</string>
+    <string name="alarm_shizuku_no_permission">Shizuku не дав доступ. Відкрийте застосунок.</string>
+    <string name="alarm_stuck_title">НЕ вдалося вимкнути</string>
+    <string name="alarm_stuck_text">%1$s. Вимкніть вручну.</string>
+    <string name="alarm_restore_title">Стан не повернуто</string>
+    <string name="alarm_restore_text">Shizuku не працює. Запустіть його і відкрийте застосунок.</string>
+    <string name="alarm_service_title">Вартовий не запустився</string>
+    <string name="alarm_service_text">Відкрийте застосунок.</string>
+    <string name="alarm_settings_title">Не читаються налаштування</string>
+    <string name="alarm_settings_text">Вартовий працює з типовими налаштуваннями. Відкрийте застосунок.</string>
+
+    <string name="radio_cellular">Стільникова мережа</string>
+    <string name="radio_mobile_data">Мобільні дані</string>
+    <string name="radio_bluetooth">Bluetooth</string>
+    <string name="radio_ble_scan">Bluetooth-сканування</string>
+    <string name="radio_nfc">NFC</string>
+    <string name="radio_hotspot">Точка доступу</string>
+    <string name="radio_uwb">UWB</string>
+    <string name="radio_thread">Thread</string>
+    <string name="radio_wifi">Wi-Fi</string>
+    <string name="radio_wifi_network">Wi-Fi мережа</string>
+
+    <string name="check_off">вимкнено</string>
+    <string name="check_on">УВІМКНЕНО</string>
+    <string name="check_unknown">невідомо</string>
+    <string name="check_cellular_off">вимкнено (режим польоту)</string>
+    <string name="check_cellular_on">УВІМКНЕНО (немає режиму польоту)</string>
+    <string name="check_wifi_allowed">увімкнено (дозволено)</string>
+    <string name="check_wifi_missing">ВИМКНЕНО (має працювати)</string>
+    <string name="check_network_none">не підключено</string>
+    <string name="check_network_ok">%1$s</string>
+    <string name="check_network_wrong">ЧУЖА МЕРЕЖА: %1$s</string>
+
+    <string name="log_guard_started">Вартовий працює.</string>
+    <string name="log_locking">Вимикаю: %1$s</string>
+    <string name="log_violation">Порушення: %1$s</string>
+    <string name="log_fixed">Виправлено: %1$s</string>
+    <string name="log_failed">НЕ вдалося виправити: %1$s</string>
+    <string name="log_shell_lost">Shizuku не працює. Зв\'язок не контролюється.</string>
+    <string name="log_shell_back">Shizuku знову працює.</string>
+    <string name="log_restored">Режим тиші вимкнено. Стан повернуто.</string>
+    <string name="log_restore_failed">Режим тиші вимкнено. Стан НЕ повернуто: Shizuku не працює.</string>
+    <string name="log_error">Помилка: %1$s</string>
+    <string name="log_network_forgotten">Чужу мережу «%1$s» забуто.</string>
+    <string name="log_network_dropped">Чужу мережу «%1$s» не знайдено серед збережених. Перезапускаю Wi-Fi.</string>
+    <string name="log_hotspot_error">Точку доступу не вдалося зупинити: %1$s</string>
+    <string name="log_settings_unreadable">Не читаються налаштування. Працюю з типовими.</string>
+
+    <string name="guard_title">Режим тиші</string>
+    <string name="guard_off">Вимкнено. Зв\'язок не контролюється.</string>
+    <string name="guard_ok">Усе вимкнено. Вартовий стежить.</string>
+    <string name="guard_violation">Є порушення. Дивіться нижче.</string>
+    <string name="guard_no_shell">Зв\'язок НЕ контролюється: немає Shizuku.</string>
+    <string name="guard_needs_shell">Спочатку запустіть Shizuku і дайте доступ.</string>
+
+    <string name="shizuku_title">Shizuku</string>
+    <string name="shizuku_ready">Працює. Доступ є.</string>
+    <string name="shizuku_not_installed">Не встановлено. Без Shizuku застосунок нічого не може вимкнути.</string>
+    <string name="shizuku_not_running">Не запущений. Відкрийте Shizuku і запустіть його.</string>
+    <string name="shizuku_no_permission">Запущений, але доступу немає.</string>
+    <string name="shizuku_grant">Дати доступ</string>
+    <string name="shizuku_open">Відкрити Shizuku</string>
+
+    <string name="notifications_title">Сповіщення вимкнені</string>
+    <string name="notifications_text">Без них ви не побачите тривогу.</string>
+    <string name="notifications_allow">Дозволити</string>
+
+    <string name="restore_title">Попередній стан не повернуто</string>
+    <string name="restore_text">Shizuku не працював, коли ви вимкнули режим. Запустіть Shizuku і натисніть кнопку. Або ввімкніть потрібне вручну.</string>
+    <string name="restore_retry">Повернути стан</string>
+
+    <string name="section_state">Стан зараз</string>
+    <string name="section_settings">Налаштування</string>
+    <string name="section_journal">Журнал</string>
+    <string name="journal_empty">Подій ще немає.</string>
+    <string name="journal_note">Журнал зберігається лише в пам\'яті.</string>
+
+    <string name="setting_keep_wifi">Wi-Fi дозволений</string>
+    <string name="setting_keep_wifi_hint">Wi-Fi лишається ввімкненим. Потрібен для Starlink.</string>
+    <string name="setting_ssid">Дозволена мережа</string>
+    <string name="setting_ssid_hint">Назва Wi-Fi мережі. Порожньо — дозволені всі.</string>
+    <string name="setting_ssid_save">Зберегти</string>
+
+    <string name="onboarding_title">Як це працює</string>
+    <string name="onboarding_1">«Режим тиші» вимикає стільникову мережу, Bluetooth, NFC, точку доступу, UWB і Thread. Wi-Fi лишається.</string>
+    <string name="onboarding_2">Вартовий стежить далі. Якщо щось увімкнеться — вимкне знову за кілька секунд.</string>
+    <string name="onboarding_3">Потрібен Shizuku. Після кожного перезавантаження телефона його треба запускати знову. Для цього потрібен Wi-Fi.</string>
+    <string name="onboarding_4">Якщо Shizuku не працює, ви побачите тривогу «Зв\'язок НЕ контролюється».</string>
+    <string name="onboarding_5">Сам Wi-Fi теж випромінює. Програмне вимкнення слабше за фізичне: SIM-карти вимикайте окремо.</string>
+    <string name="onboarding_done">Зрозуміло</string>
+</resources>
