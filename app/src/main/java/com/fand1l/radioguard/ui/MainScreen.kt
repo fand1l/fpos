@@ -1,6 +1,7 @@
 package com.fand1l.radioguard.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -49,6 +51,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fand1l.radioguard.R
 import com.fand1l.radioguard.guard.JournalEntry
@@ -62,6 +65,12 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 private val QuietGreen = Color(0xFF2E7D32)
+private val QuietGreenDark = Color(0xFF66BB6A)
+private val LoudRed = Color(0xFFC62828)
+private val LoudRedDark = Color(0xFFEF5350)
+
+// Довгий стан (назва чужої мережі) переноситься сам і не стискає назву радіо.
+private val StateTextMaxWidth = 180.dp
 
 @Composable
 fun MainScreen(
@@ -152,7 +161,7 @@ private fun Dashboard(
         if (state.journal.isEmpty()) {
             item { Hint(stringResource(R.string.journal_empty)) }
         } else {
-            items(state.journal, key = { it.timeMillis to it.text }) { JournalRow(it) }
+            items(state.journal, key = { it.id }) { JournalRow(it) }
         }
         item { Hint(stringResource(R.string.journal_note)) }
     }
@@ -288,9 +297,10 @@ private fun Hint(text: String) {
 
 @Composable
 private fun CheckRow(check: Check) {
+    val dark = isSystemInDarkTheme()
     val color = when (check.status) {
-        CheckStatus.OK -> QuietGreen
-        CheckStatus.VIOLATION -> MaterialTheme.colorScheme.error
+        CheckStatus.OK -> if (dark) QuietGreenDark else QuietGreen
+        CheckStatus.VIOLATION -> if (dark) LoudRedDark else LoudRed
         CheckStatus.UNKNOWN -> MaterialTheme.colorScheme.outline
     }
     // Один рядок для читача екрана: «Bluetooth, вимкнено».
@@ -320,6 +330,8 @@ private fun CheckRow(check: Check) {
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (check.status == CheckStatus.VIOLATION) FontWeight.Bold else FontWeight.Normal,
             color = if (check.status == CheckStatus.VIOLATION) color else MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.End,
+            modifier = Modifier.widthIn(max = StateTextMaxWidth),
         )
     }
 }

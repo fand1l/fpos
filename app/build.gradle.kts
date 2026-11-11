@@ -63,6 +63,13 @@ android {
         abortOnError = true
         checkReleaseBuilds = false
     }
+
+    testOptions {
+        unitTests {
+            // Потрібно тесту, який запускає екран у Robolectric.
+            isIncludeAndroidResources = true
+        }
+    }
 }
 
 dependencies {
@@ -81,4 +88,9 @@ dependencies {
     implementation(libs.shizuku.provider)
 
     testImplementation(libs.junit)
+    // Лише для тестів, у APK не потрапляють. Запустити застосунок на телефоні з CI нічим,
+    // тому старт екрана перевіряємо в емульованому Android.
+    testImplementation(libs.robolectric)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
 }

@@ -38,8 +38,8 @@
     <string name="check_off">вимкнено</string>
     <string name="check_on">УВІМКНЕНО</string>
     <string name="check_unknown">невідомо</string>
-    <string name="check_cellular_off">вимкнено (режим польоту)</string>
-    <string name="check_cellular_on">УВІМКНЕНО (немає режиму польоту)</string>
+    <string name="check_cellular_off">режим польоту</string>
+    <string name="check_cellular_on">УВІМКНЕНО</string>
     <string name="check_wifi_allowed">увімкнено (дозволено)</string>
     <string name="check_wifi_missing">ВИМКНЕНО (має працювати)</string>
     <string name="check_network_none">не підключено</string>

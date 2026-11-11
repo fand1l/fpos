@@ -86,6 +86,8 @@ class GuardService : Service() {
     private var stuck: Set<Radio> = emptySet()
     private var shellError: String? = null
     private var hotspotError: String? = null
+
+    @Volatile
     private var lastStatusText: String? = null
 
     private val settingsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
@@ -143,7 +145,8 @@ class GuardService : Service() {
     }
 
     private fun enterForeground() {
-        val notification = notifier.status(getString(R.string.status_starting))
+        // Повторний запуск уже працюючої служби не повинен затирати справжній стан.
+        val notification = notifier.status(lastStatusText ?: getString(R.string.status_starting))
         foregroundFailed = try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                 startForeground(
@@ -250,9 +253,10 @@ class GuardService : Service() {
 
         var checks = currentChecks(settings)
         val violations = checks.violations()
+        // Те, що вимкнулося саме, більше не «висить» і не має лишатись у тривозі.
+        stuck = stuck intersect violations
         if (violations.isEmpty()) {
             backoff.onSuccess()
-            stuck = emptySet()
         } else if (violations.any { it !in stuck } || backoff.canAttempt(SystemClock.elapsedRealtime())) {
             if (violations != stuck) {
                 val message = if (firstLock) R.string.log_locking else R.string.log_violation
@@ -401,7 +405,10 @@ class GuardService : Service() {
     }
 
     private fun registerWatchers() {
-        contentResolver.registerContentObserver(Settings.Global.CONTENT_URI, true, settingsObserver)
+        // Лише потрібні ключі: кожна подія будить телефон, а в Settings.Global пишуть багато хто.
+        WATCHED_SETTINGS.forEach { key ->
+            contentResolver.registerContentObserver(Settings.Global.getUriFor(key), false, settingsObserver)
+        }
 
         val filter = IntentFilter().apply {
             addAction(Intent.ACTION_AIRPLANE_MODE_CHANGED)
@@ -460,6 +467,14 @@ class GuardService : Service() {
     }
 
     companion object {
+        private val WATCHED_SETTINGS = listOf(
+            Settings.Global.AIRPLANE_MODE_ON,
+            Settings.Global.BLUETOOTH_ON,
+            Settings.Global.WIFI_ON,
+            "ble_scan_always_enabled",
+            "mobile_data",
+        )
+
         private const val TICK_MS = 3_000L
         private const val DEBOUNCE_MS = 200L
         private const val SETTLE_MS = 2_000L

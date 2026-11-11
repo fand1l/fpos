@@ -203,6 +203,7 @@ Shizuku через ADB працює як користувач shell (uid 2000). 
 - Workflow `.github/workflows/build.yml` (на кожен push і вручну): тести + lint → `./gradlew assembleRelease` → перевірка, що в APK немає `INTERNET` → артефакт `radioguard-apk`.
 - R8 вимкнено (APK ≈ 20 МБ): Shizuku створює `ShellService` за іменем класу, а перевірити обфускований APK без телефона нічим.
 - Підпис: якщо в GitHub Secrets є `RADIOGUARD_KEYSTORE_BASE64`, `RADIOGUARD_KEYSTORE_PASSWORD`, `RADIOGUARD_KEY_ALIAS`, `RADIOGUARD_KEY_PASSWORD` — release підписується цим ключем, і оновлення ставляться «поверх» (`versionCode` = номер прогону CI). Без секретів — debug-ключ, різний у кожній збірці. Як додати секрети — `README.md`.
+- Лише для тестів (у APK не потрапляють): Robolectric 4.14.1 і `compose-ui-test-junit4`. Вони запускають екран в емульованому Android 15, щоб упіймати падіння на старті до встановлення на телефон.
 - Версії з цього розділу перевірено: усі є на Google Maven / Maven Central. Є значно новіші (AGP 9.x, Compose BOM 2026.x) — оновлення не робили, щоб не відходити від плану.
 
 ---
@@ -235,7 +236,7 @@ Shizuku через ADB працює як користувач shell (uid 2000). 
   - Якщо підключені до іншої мережі → розірвати і забути її (команди перевірити на Pixel: `cmd wifi forget-network`, `cmd wifi disconnect` або схожі).
   - Обмеження: SSID можна підробити. На роутері Starlink — сильний пароль WPA2/WPA3; за можливості додатково звіряти BSSID (MAC роутера).
 - [ ] Release-підпис: workflow готовий; лишилось створити keystore і додати секрети (див. `README.md`)
-- [x] Юніт-тести: `RadioState.checks()`, `Lockdown`, `ShellProbe`, `Backoff` (чисті функції)
+- [x] Юніт-тести: `RadioState.checks()`, `Lockdown`, `ShellProbe`, `Backoff` (чисті функції); тест старту екрана в Robolectric
 - [ ] Перевірити поведінку при вбивстві процесу, перезавантаженні, зміні мережі (на телефоні)
 - [x] Обробити випадок, коли немає NFC, немає SIM, два SIM: рядок NFC/UWB/Thread ховається, якщо радіо немає; мобільні дані читаються через `TelephonyManager` і не дають тривоги
 - [x] Іконка застосунку, екран пояснень при першому запуску

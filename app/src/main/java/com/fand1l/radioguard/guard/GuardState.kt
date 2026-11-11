@@ -5,13 +5,16 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import java.util.concurrent.atomic.AtomicLong
 
-data class JournalEntry(val timeMillis: Long, val text: String)
+/** [id] потрібен екрану: два однакові записи можуть з'явитись у ту саму мілісекунду. */
+data class JournalEntry(val id: Long, val timeMillis: Long, val text: String)
 
 /** Живе лише в пам'яті: журнал не можна писати на диск. */
 object GuardState {
 
     private const val MAX_ENTRIES = 40
+    private val nextId = AtomicLong()
 
     private val _journal = MutableStateFlow<List<JournalEntry>>(emptyList())
     val journal: StateFlow<List<JournalEntry>> = _journal.asStateFlow()
@@ -21,7 +24,7 @@ object GuardState {
     val checks: StateFlow<List<Check>?> = _checks.asStateFlow()
 
     fun log(text: String) {
-        val entry = JournalEntry(System.currentTimeMillis(), text)
+        val entry = JournalEntry(nextId.incrementAndGet(), System.currentTimeMillis(), text)
         _journal.update { (listOf(entry) + it).take(MAX_ENTRIES) }
     }
 
