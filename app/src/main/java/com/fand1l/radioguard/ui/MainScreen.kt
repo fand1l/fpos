@@ -5,6 +5,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -22,11 +23,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -50,13 +51,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.fand1l.radioguard.R
+import com.fand1l.radioguard.guard.GuardRequest
 import com.fand1l.radioguard.guard.GuardSummary
 import com.fand1l.radioguard.guard.JournalEntry
 import com.fand1l.radioguard.radio.Check
@@ -80,11 +84,9 @@ private val StateTextMaxWidth = 180.dp
 fun MainScreen(
     state: MainUiState,
     notificationsAllowed: Boolean,
-    confirmOff: Boolean,
     canAddTile: Boolean,
     canAddWidget: Boolean,
     actions: MainActions,
-    onConfirmOffHandled: () -> Unit,
     onOpenShizuku: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
     onAddTile: () -> Unit,
@@ -108,36 +110,118 @@ fun MainScreen(
         }
     }
 
-    // Прохання вимкнути прийшло з плитки чи віджета. Якщо режим уже вимкнено, питати нема про що.
-    if (confirmOff && state.loaded) {
-        if (state.guardOn) {
-            ConfirmOffDialog(
-                onConfirm = {
-                    actions.onGuardToggle(false)
-                    onConfirmOffHandled()
+    if (!state.loaded) return
+    when (state.confirmation) {
+        GuardRequest.TURN_ON -> ConfirmOnDialog(state, actions)
+        GuardRequest.TURN_OFF -> ConfirmOffDialog(state, actions)
+        // Режим уже такий, як просили (наприклад, плитку натиснули двічі): питати нема про що.
+        null -> if (state.request != null) LaunchedEffect(state.request) { actions.onDismissRequest() }
+    }
+}
+
+@Composable
+private fun ConfirmOnDialog(state: MainUiState, actions: MainActions) {
+    ChoiceDialog(
+        title = stringResource(R.string.confirm_on_title),
+        onDismiss = actions::onDismissRequest,
+        body = {
+            val silence = state.toSilence
+            val exceptions = state.allowable.filter { it in state.allowed }
+            DialogText(
+                if (silence.isEmpty()) {
+                    stringResource(R.string.confirm_on_nothing)
+                } else {
+                    stringResource(R.string.confirm_on_silence, names(silence))
                 },
-                onDismiss = onConfirmOffHandled,
             )
-        } else {
-            LaunchedEffect(Unit) { onConfirmOffHandled() }
+            if (exceptions.isNotEmpty()) DialogText(stringResource(R.string.confirm_on_allowed, names(exceptions)))
+            if (state.keepWifi) DialogText(stringResource(R.string.confirm_on_wifi))
+            if (!state.shizukuReady) {
+                DialogText(stringResource(R.string.confirm_on_no_shell), color = MaterialTheme.colorScheme.error)
+            }
+        },
+    ) {
+        Button(
+            onClick = actions::onConfirmOn,
+            enabled = state.shizukuReady,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text(stringResource(R.string.confirm_on_yes)) }
+        TextButton(onClick = actions::onDismissRequest, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.confirm_cancel))
         }
     }
 }
 
 @Composable
-private fun ConfirmOffDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.confirm_off_title)) },
-        text = { Text(stringResource(R.string.confirm_off_text)) },
-        confirmButton = {
-            TextButton(onClick = onConfirm) { Text(stringResource(R.string.confirm_off_yes)) }
+private fun ConfirmOffDialog(state: MainUiState, actions: MainActions) {
+    val restore = state.toRestore
+    ChoiceDialog(
+        title = stringResource(R.string.confirm_off_title),
+        onDismiss = actions::onDismissRequest,
+        body = {
+            DialogText(stringResource(R.string.confirm_off_text))
+            if (restore.isNotEmpty()) DialogText(stringResource(R.string.confirm_off_restore_list, names(restore)))
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_off_no)) }
-        },
-    )
+    ) {
+        if (restore.isEmpty()) {
+            OutlinedButton(onClick = { actions.onConfirmOff(restore = true) }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.confirm_off_yes))
+            }
+        } else {
+            // Безпечніший варіант — першим.
+            OutlinedButton(onClick = { actions.onConfirmOff(restore = false) }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.confirm_off_keep))
+            }
+            OutlinedButton(onClick = { actions.onConfirmOff(restore = true) }, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.confirm_off_restore))
+            }
+        }
+        TextButton(onClick = actions::onDismissRequest, modifier = Modifier.fillMaxWidth()) {
+            Text(stringResource(R.string.confirm_cancel))
+        }
+    }
 }
+
+/** Діалог із кнопками на всю ширину, одна під одною: довгі підписи не ламаються. */
+@Composable
+private fun ChoiceDialog(
+    title: String,
+    onDismiss: () -> Unit,
+    body: @Composable ColumnScope.() -> Unit,
+    buttons: @Composable ColumnScope.() -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = MaterialTheme.shapes.extraLarge,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+        ) {
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineSmall,
+                    modifier = Modifier.semantics { heading() },
+                )
+                body()
+                Spacer(Modifier.height(4.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp), content = buttons)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialogText(text: String, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+    Text(text = text, style = MaterialTheme.typography.bodyMedium, color = color)
+}
+
+@Composable
+private fun names(radios: List<Radio>): String = radios.map { stringResource(it.labelRes) }.joinToString()
 
 @Composable
 private fun Dashboard(
@@ -165,7 +249,9 @@ private fun Dashboard(
                 modifier = Modifier.semantics { heading() },
             )
         }
-        item { GuardCard(state, onToggle = actions::onGuardToggle) }
+        item {
+            GuardCard(state) { on -> actions.onRequest(if (on) GuardRequest.TURN_ON else GuardRequest.TURN_OFF) }
+        }
 
         if (!state.shizukuReady) {
             item { ShizukuCard(state.shizuku, onGrant = actions::onShizukuGrant, onOpen = onOpenShizuku) }
@@ -211,6 +297,9 @@ private fun Dashboard(
             )
         }
 
+        item { SectionTitle(stringResource(R.string.section_exceptions)) }
+        item { ExceptionsCard(state.allowable, state.allowed, actions::onAllowChange) }
+
         item { SectionTitle(stringResource(R.string.section_quick)) }
         item { QuickAccessCard(canAddTile, canAddWidget, onAddTile, onAddWidget) }
 
@@ -253,17 +342,22 @@ private fun GuardCard(state: MainUiState, onToggle: (Boolean) -> Unit) {
                     fontWeight = FontWeight.Bold,
                 )
                 Spacer(Modifier.height(4.dp))
+                val exceptions = state.allowedAndOn
                 Text(
-                    text = stringResource(
-                        when (summary) {
-                            GuardSummary.OFF ->
-                                if (state.shizukuReady) R.string.guard_off else R.string.guard_needs_shell
-                            GuardSummary.STARTING -> R.string.guard_starting
-                            GuardSummary.OK -> R.string.guard_ok
-                            GuardSummary.VIOLATION -> R.string.guard_violation
-                            GuardSummary.NO_SHELL -> R.string.guard_no_shell
-                        },
-                    ),
+                    text = when {
+                        summary == GuardSummary.OK && exceptions.isNotEmpty() ->
+                            stringResource(R.string.guard_ok_exceptions, names(exceptions))
+                        else -> stringResource(
+                            when (summary) {
+                                GuardSummary.OFF ->
+                                    if (state.shizukuReady) R.string.guard_off else R.string.guard_needs_shell
+                                GuardSummary.STARTING -> R.string.guard_starting
+                                GuardSummary.OK -> R.string.guard_ok
+                                GuardSummary.VIOLATION -> R.string.guard_violation
+                                GuardSummary.NO_SHELL -> R.string.guard_no_shell
+                            },
+                        )
+                    },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
@@ -345,11 +439,12 @@ private fun SectionTitle(text: String) {
 }
 
 @Composable
-private fun Hint(text: String) {
+private fun Hint(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = modifier,
     )
 }
 
@@ -360,6 +455,7 @@ private fun CheckRow(check: Check) {
         CheckStatus.OK -> if (dark) QuietGreenDark else QuietGreen
         CheckStatus.VIOLATION -> if (dark) LoudRedDark else LoudRed
         CheckStatus.UNKNOWN -> MaterialTheme.colorScheme.outline
+        CheckStatus.ALLOWED -> MaterialTheme.colorScheme.primary
     }
     // Один рядок для читача екрана: «Bluetooth, вимкнено».
     Row(
@@ -396,6 +492,13 @@ private fun CheckRow(check: Check) {
 
 @Composable
 private fun Check.stateText(): String = when {
+    status == CheckStatus.ALLOWED -> stringResource(
+        when (on) {
+            true -> R.string.check_allowed_on
+            false -> R.string.check_allowed_off
+            null -> R.string.check_allowed
+        },
+    )
     status == CheckStatus.UNKNOWN -> stringResource(R.string.check_unknown)
     radio == Radio.CELLULAR -> stringResource(
         if (status == CheckStatus.OK) R.string.check_cellular_off else R.string.check_cellular_on,
@@ -462,6 +565,40 @@ private fun SettingsCard(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text(stringResource(R.string.setting_ssid_save))
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExceptionsCard(radios: List<Radio>, allowed: Set<Radio>, onAllowChange: (Radio, Boolean) -> Unit) {
+    Card {
+        Column(modifier = Modifier.padding(vertical = 8.dp)) {
+            Hint(
+                text = stringResource(R.string.exceptions_hint),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            )
+            radios.forEach { radio ->
+                val isAllowed = radio in allowed
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp)
+                        .toggleable(value = isAllowed, role = Role.Switch) { onAllowChange(radio, it) }
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = stringResource(radio.labelRes), style = MaterialTheme.typography.bodyLarge)
+                        Hint(
+                            stringResource(
+                                if (isAllowed) R.string.exception_allowed else R.string.exception_blocked,
+                            ),
+                        )
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Switch(checked = isAllowed, onCheckedChange = null)
+                }
             }
         }
     }

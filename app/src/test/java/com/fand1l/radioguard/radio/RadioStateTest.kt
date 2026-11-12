@@ -30,7 +30,8 @@ class RadioStateTest {
         probe: ProbeState? = quietProbe,
         keepWifi: Boolean = true,
         allowedSsid: String = "",
-    ) = checks(probe, keepWifi, allowedSsid).violations()
+        allowed: Set<Radio> = emptySet(),
+    ) = checks(probe, keepWifi, allowedSsid, allowed).violations()
 
     private fun RadioState.status(radio: Radio, probe: ProbeState? = quietProbe, allowedSsid: String = "") =
         checks(probe, keepWifi = true, allowedSsid).first { it.radio == radio }.status
@@ -131,14 +132,60 @@ class RadioStateTest {
     }
 
     @Test
-    fun `only mobile data is non-critical`() {
-        assertEquals(listOf(Radio.MOBILE_DATA), Radio.entries.filterNot { it.critical })
+    fun `only mobile data and location are non-critical`() {
+        assertEquals(listOf(Radio.MOBILE_DATA, Radio.LOCATION), Radio.entries.filterNot { it.critical })
+    }
+
+    @Test
+    fun `allowed radios are never violations and keep their real state`() {
+        val loud = quiet.copy(airplaneOn = false, bluetoothOn = true, locationOn = true)
+        val allowed = setOf(Radio.CELLULAR, Radio.BLUETOOTH, Radio.LOCATION)
+        val checks = loud.checks(quietProbe, keepWifi = true, allowedSsid = "", allowed = allowed)
+        assertTrue(checks.violations().isEmpty())
+        val bluetooth = checks.first { it.radio == Radio.BLUETOOTH }
+        assertEquals(CheckStatus.ALLOWED, bluetooth.status)
+        assertEquals(true, bluetooth.on)
+        assertEquals(true, checks.first { it.radio == Radio.CELLULAR }.on)
+        assertEquals(listOf(Radio.CELLULAR, Radio.BLUETOOTH, Radio.LOCATION), checks.allowedAndOn())
+    }
+
+    @Test
+    fun `allowing one radio does not excuse the others`() {
+        val loud = quiet.copy(bluetoothOn = true, nfcOn = true)
+        assertEquals(setOf(Radio.NFC), loud.violations(allowed = setOf(Radio.BLUETOOTH)))
+    }
+
+    @Test
+    fun `location is blocked only when it is not allowed`() {
+        val located = quiet.copy(locationOn = true)
+        assertEquals(setOf(Radio.LOCATION), located.violations(allowed = emptySet()))
+        assertTrue(located.violations(allowed = Radio.DEFAULT_ALLOWED).isEmpty())
+    }
+
+    @Test
+    fun `by default only location is allowed`() {
+        assertEquals(setOf(Radio.LOCATION), Radio.DEFAULT_ALLOWED)
+    }
+
+    @Test
+    fun `wifi is never an exception, it has its own setting`() {
+        assertFalse(Radio.WIFI.allowable)
+        assertFalse(Radio.WIFI_NETWORK.allowable)
+        val checks = quiet.copy(wifiOn = false).checks(quietProbe, keepWifi = true, allowedSsid = "", allowed = setOf(Radio.WIFI))
+        assertEquals(setOf(Radio.WIFI), checks.violations())
+    }
+
+    @Test
+    fun `gps does not count as an emitting radio`() {
+        assertFalse(Radio.LOCATION.emits)
+        assertTrue(Radio.entries.filter { it != Radio.LOCATION }.all { it.emits })
     }
 
     @Test
     fun `snapshot keeps what was on before`() {
         val before = quiet.copy(airplaneOn = false, bluetoothOn = true, nfcOn = null)
-        val snapshot = before.snapshot(quietProbe.copy(uwbOn = true))
+        val snapshot = before.copy(locationOn = true).snapshot(quietProbe.copy(uwbOn = true))
+        assertEquals(true, snapshot.locationOn)
         assertEquals(false, snapshot.airplaneOn)
         assertEquals(true, snapshot.bluetoothOn)
         assertNull(snapshot.nfcOn)

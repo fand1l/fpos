@@ -10,7 +10,9 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStoreFile
+import com.fand1l.radioguard.radio.Radio
 import com.fand1l.radioguard.radio.Snapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -23,6 +25,9 @@ data class GuardSettings(
     /** Режим вимкнули, але попередній стан ще не повернуто. */
     val restorePending: Boolean = false,
     val onboardingDone: Boolean = false,
+    /** Пункти, які вартовий не вимикає. */
+    val allowed: Set<Radio> = Radio.DEFAULT_ALLOWED,
+    val snapshot: Snapshot = Snapshot(),
 )
 
 /**
@@ -38,22 +43,23 @@ class Prefs(private val store: DataStore<Preferences>) {
             allowedSsid = prefs[ALLOWED_SSID].orEmpty(),
             restorePending = prefs[RESTORE_PENDING] ?: false,
             onboardingDone = prefs[ONBOARDING_DONE] ?: false,
+            allowed = prefs.allowed(),
+            snapshot = Snapshot(
+                airplaneOn = prefs[SNAP_AIRPLANE],
+                mobileDataOn = prefs[SNAP_MOBILE_DATA],
+                bluetoothOn = prefs[SNAP_BLUETOOTH],
+                bleScanOn = prefs[SNAP_BLE_SCAN],
+                nfcOn = prefs[SNAP_NFC],
+                wifiOn = prefs[SNAP_WIFI],
+                uwbOn = prefs[SNAP_UWB],
+                locationOn = prefs[SNAP_LOCATION],
+            ),
         )
     }
 
     suspend fun current(): GuardSettings = settings.first()
 
-    suspend fun snapshot(): Snapshot = store.data.first().let { prefs ->
-        Snapshot(
-            airplaneOn = prefs[SNAP_AIRPLANE],
-            mobileDataOn = prefs[SNAP_MOBILE_DATA],
-            bluetoothOn = prefs[SNAP_BLUETOOTH],
-            bleScanOn = prefs[SNAP_BLE_SCAN],
-            nfcOn = prefs[SNAP_NFC],
-            wifiOn = prefs[SNAP_WIFI],
-            uwbOn = prefs[SNAP_UWB],
-        )
-    }
+    suspend fun snapshot(): Snapshot = current().snapshot
 
     suspend fun enableGuard(snapshot: Snapshot) {
         store.edit { prefs ->
@@ -67,15 +73,17 @@ class Prefs(private val store: DataStore<Preferences>) {
                 prefs.putOrRemove(SNAP_NFC, snapshot.nfcOn)
                 prefs.putOrRemove(SNAP_WIFI, snapshot.wifiOn)
                 prefs.putOrRemove(SNAP_UWB, snapshot.uwbOn)
+                prefs.putOrRemove(SNAP_LOCATION, snapshot.locationOn)
             }
             prefs[GUARD_ON] = true
             prefs[RESTORE_PENDING] = false
         }
     }
 
-    suspend fun disableGuard() {
+    /** [restore] = false: радіо лишаються вимкненими, вмикати їх людина буде сама. */
+    suspend fun disableGuard(restore: Boolean = true) {
         store.edit { prefs ->
-            if (prefs[GUARD_ON] == true) prefs[RESTORE_PENDING] = true
+            if (prefs[GUARD_ON] == true) prefs[RESTORE_PENDING] = restore
             prefs[GUARD_ON] = false
         }
     }
@@ -92,8 +100,22 @@ class Prefs(private val store: DataStore<Preferences>) {
         store.edit { it[ALLOWED_SSID] = ssid.trim() }
     }
 
+    suspend fun setAllowed(radio: Radio, allowed: Boolean) {
+        if (!radio.allowable) return
+        store.edit { prefs ->
+            val current = prefs.allowed()
+            prefs[ALLOWED_RADIOS] = (if (allowed) current + radio else current - radio).mapTo(mutableSetOf()) { it.name }
+        }
+    }
+
     suspend fun setOnboardingDone() {
         store.edit { it[ONBOARDING_DONE] = true }
+    }
+
+    /** Невідомі назви (з іншої версії застосунку) пропускаємо. */
+    private fun Preferences.allowed(): Set<Radio> {
+        val names = this[ALLOWED_RADIOS] ?: return Radio.DEFAULT_ALLOWED
+        return Radio.entries.filterTo(linkedSetOf()) { it.allowable && it.name in names }
     }
 
     private fun MutablePreferences.putOrRemove(key: Preferences.Key<Boolean>, value: Boolean?) {
@@ -121,5 +143,7 @@ class Prefs(private val store: DataStore<Preferences>) {
         private val SNAP_NFC = booleanPreferencesKey("snap_nfc")
         private val SNAP_WIFI = booleanPreferencesKey("snap_wifi")
         private val SNAP_UWB = booleanPreferencesKey("snap_uwb")
+        private val SNAP_LOCATION = booleanPreferencesKey("snap_location")
+        private val ALLOWED_RADIOS = stringSetPreferencesKey("allowed_radios")
     }
 }

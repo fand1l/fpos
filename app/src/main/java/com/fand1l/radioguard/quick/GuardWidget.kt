@@ -5,12 +5,10 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.widget.RemoteViews
 import com.fand1l.radioguard.App
 import com.fand1l.radioguard.MainActivity
 import com.fand1l.radioguard.R
-import com.fand1l.radioguard.guard.GuardService
 import com.fand1l.radioguard.guard.GuardSummary
 import com.fand1l.radioguard.guard.QuickAction
 import com.fand1l.radioguard.guard.QuickState
@@ -18,15 +16,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 class GuardWidget : AppWidgetProvider() {
-
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == ACTION_TURN_ON) {
-            // Запуск служби дозволений саме зараз, поки триває обробка дотику.
-            GuardService.enable(context)
-        } else {
-            super.onReceive(context, intent)
-        }
-    }
 
     override fun onUpdate(context: Context, manager: AppWidgetManager, appWidgetIds: IntArray) {
         val app = context.applicationContext as App
@@ -41,8 +30,6 @@ class GuardWidget : AppWidgetProvider() {
     }
 
     companion object {
-        private const val ACTION_TURN_ON = "com.fand1l.radioguard.action.WIDGET_TURN_ON"
-
         fun render(context: Context, state: QuickState) {
             val manager = AppWidgetManager.getInstance(context) ?: return
             val ids = manager.getAppWidgetIds(ComponentName(context, GuardWidget::class.java))
@@ -60,7 +47,7 @@ class GuardWidget : AppWidgetProvider() {
         private fun statusText(state: QuickState): Int = when (state.summary) {
             GuardSummary.OFF -> if (state.shizukuReady) R.string.quick_off_hint else R.string.quick_no_shizuku
             GuardSummary.STARTING -> R.string.quick_starting
-            GuardSummary.OK -> R.string.quick_ok
+            GuardSummary.OK -> if (state.exceptionsOn) R.string.quick_ok_exceptions else R.string.quick_ok
             GuardSummary.VIOLATION -> R.string.quick_violation
             GuardSummary.NO_SHELL -> R.string.quick_no_shell
         }
@@ -71,18 +58,7 @@ class GuardWidget : AppWidgetProvider() {
             GuardSummary.VIOLATION, GuardSummary.NO_SHELL -> R.drawable.widget_bg_alarm
         }
 
-        private fun clickIntent(context: Context, action: QuickAction): PendingIntent {
-            val flags = PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            return when (action) {
-                QuickAction.TURN_ON -> PendingIntent.getBroadcast(
-                    context,
-                    0,
-                    Intent(context, GuardWidget::class.java).setAction(ACTION_TURN_ON),
-                    flags,
-                )
-                QuickAction.OPEN_APP -> MainActivity.pendingIntent(context, confirmOff = false)
-                QuickAction.CONFIRM_OFF -> MainActivity.pendingIntent(context, confirmOff = true)
-            }
-        }
+        private fun clickIntent(context: Context, action: QuickAction): PendingIntent =
+            MainActivity.pendingIntent(context, action.request)
     }
 }

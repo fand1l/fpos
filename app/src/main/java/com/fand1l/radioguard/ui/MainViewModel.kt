@@ -9,13 +9,21 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.fand1l.radioguard.App
 import com.fand1l.radioguard.R
 import com.fand1l.radioguard.data.GuardSettings
+import com.fand1l.radioguard.guard.GuardRequest
 import com.fand1l.radioguard.guard.GuardService
 import com.fand1l.radioguard.guard.GuardState
 import com.fand1l.radioguard.guard.GuardSummary
 import com.fand1l.radioguard.guard.JournalEntry
+import com.fand1l.radioguard.guard.confirmationFor
 import com.fand1l.radioguard.guard.guardSummary
 import com.fand1l.radioguard.radio.Check
+import com.fand1l.radioguard.radio.Radio
 import com.fand1l.radioguard.radio.RadioReader
+import com.fand1l.radioguard.radio.Snapshot
+import com.fand1l.radioguard.radio.allowedAndOn
+import com.fand1l.radioguard.radio.currentlyOn
+import com.fand1l.radioguard.radio.radiosToRestore
+import com.fand1l.radioguard.radio.radiosToSilence
 import com.fand1l.radioguard.shizuku.PrivilegedShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -42,6 +50,10 @@ data class MainUiState(
     val enabling: Boolean = false,
     val checks: List<Check> = emptyList(),
     val journal: List<JournalEntry> = emptyList(),
+    val allowed: Set<Radio> = Radio.DEFAULT_ALLOWED,
+    val snapshot: Snapshot = Snapshot(),
+    /** Зміна режиму, яка чекає на підтвердження. */
+    val request: GuardRequest? = null,
 ) {
     val shizukuReady: Boolean get() = shizuku == PrivilegedShell.Status.READY
 
@@ -49,11 +61,29 @@ data class MainUiState(
 
     /** Без Shizuku режим не ввімкнути, але вимкнути можна завжди. */
     val canToggle: Boolean get() = !busy && !enabling && (guardOn || shizukuReady)
+
+    val confirmation: GuardRequest? get() = confirmationFor(request, guardOn)
+
+    val toSilence: List<Radio> get() = radiosToSilence(checks.map { it.radio }, allowed, keepWifi)
+
+    val toRestore: List<Radio> get() = radiosToRestore(snapshot, checks.currentlyOn())
+
+    val allowedAndOn: List<Radio> get() = checks.allowedAndOn()
+
+    /** Пункти, які можна дозволити на цьому телефоні. */
+    val allowable: List<Radio> get() = checks.map { it.radio }.filter { it.allowable }
 }
 
 @Stable
 interface MainActions {
-    fun onGuardToggle(on: Boolean)
+    /** Перемикач, плитка чи віджет просять змінити режим; спершу — підтвердження. */
+    fun onRequest(request: GuardRequest)
+    fun onDismissRequest()
+    fun onConfirmOn()
+
+    /** [restore] = false: вартовий зупиняється, а радіо лишаються вимкненими. */
+    fun onConfirmOff(restore: Boolean)
+    fun onAllowChange(radio: Radio, allowed: Boolean)
     fun onKeepWifiChange(keep: Boolean)
     fun onSsidSave(ssid: String)
     fun onShizukuGrant()
@@ -66,6 +96,7 @@ class MainViewModel(private val app: App) : ViewModel(), MainActions {
     private val prefs = app.prefs
     private val reader = RadioReader(app)
     private val busy = MutableStateFlow(false)
+    private val request = MutableStateFlow<GuardRequest?>(null)
 
     /** Поки екран відкритий, стан перечитуємо самі: служба може й не працювати. */
     private val localState = flow {
@@ -82,13 +113,20 @@ class MainViewModel(private val app: App) : ViewModel(), MainActions {
         emit(GuardSettings())
     }
 
+    private data class Inputs(
+        val settings: GuardSettings,
+        val shizuku: PrivilegedShell.Status,
+        val busy: Boolean,
+        val request: GuardRequest?,
+    )
+
     val uiState: StateFlow<MainUiState> = combine(
-        combine(settings, PrivilegedShell.status, busy, ::Triple),
+        combine(settings, PrivilegedShell.status, busy, request, ::Inputs),
         localState,
         GuardState.checks,
         GuardState.journal,
         GuardState.enabling,
-    ) { (settings, shizuku, busy), local, guardChecks, journal, enabling ->
+    ) { (settings, shizuku, busy, request), local, guardChecks, journal, enabling ->
         MainUiState(
             loaded = true,
             guardOn = settings.guardOn,
@@ -100,22 +138,37 @@ class MainViewModel(private val app: App) : ViewModel(), MainActions {
             busy = busy,
             enabling = enabling,
             checks = guardChecks?.takeIf { settings.guardOn }
-                ?: local.checks(probe = null, settings.keepWifi, settings.allowedSsid),
+                ?: local.checks(probe = null, settings.keepWifi, settings.allowedSsid, settings.allowed),
             journal = journal,
+            allowed = settings.allowed,
+            snapshot = settings.snapshot,
+            request = request,
         )
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS), MainUiState())
 
-    override fun onGuardToggle(on: Boolean) {
-        if (on) {
-            // Знімок стану і запис налаштувань робить сама служба — так само, як для плитки й віджета.
-            GuardService.enable(app)
-        } else {
-            write {
-                prefs.disableGuard()
-                GuardService.start(app)
-            }
+    override fun onRequest(request: GuardRequest) {
+        this.request.value = request
+    }
+
+    override fun onDismissRequest() {
+        request.value = null
+    }
+
+    override fun onConfirmOn() {
+        request.value = null
+        // Знімок стану і запис налаштувань робить сама служба.
+        if (PrivilegedShell.refresh() == PrivilegedShell.Status.READY) GuardService.enable(app)
+    }
+
+    override fun onConfirmOff(restore: Boolean) {
+        request.value = null
+        write {
+            prefs.disableGuard(restore)
+            GuardService.start(app)
         }
     }
+
+    override fun onAllowChange(radio: Radio, allowed: Boolean) = write { prefs.setAllowed(radio, allowed) }
 
     override fun onKeepWifiChange(keep: Boolean) = write { prefs.setKeepWifi(keep) }
 

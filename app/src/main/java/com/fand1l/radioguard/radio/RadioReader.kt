@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothManager
 import android.content.Context
 import android.content.IntentFilter
+import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.nfc.NfcAdapter
 import android.os.Build
@@ -21,6 +22,7 @@ class RadioReader(context: Context) {
     private val telephony = app.getSystemService(TelephonyManager::class.java)
     private val bluetooth = app.getSystemService(BluetoothManager::class.java)?.adapter
     private val nfc: NfcAdapter? = NfcAdapter.getDefaultAdapter(app)
+    private val location = app.getSystemService(LocationManager::class.java)
 
     /** [softApSeen] — служба бачила подію «точка доступу вмикається» і ще не бачила вимкнення. */
     // isDataEnabled досить звичайного ACCESS_NETWORK_STATE; lint бачить у переліку ще й небезпечні дозволи.
@@ -34,6 +36,7 @@ class RadioReader(context: Context) {
         nfcOn = attempt { nfc?.isEnabled },
         hotspotOn = if (softApSeen) true else tetheringActive(),
         wifiOn = attempt { wifi?.isWifiEnabled },
+        locationOn = attempt { location?.isLocationEnabled },
     )
 
     private fun globalFlag(key: String): Boolean? =

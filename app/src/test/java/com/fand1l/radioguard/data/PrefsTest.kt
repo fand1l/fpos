@@ -1,6 +1,7 @@
 package com.fand1l.radioguard.data
 
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import com.fand1l.radioguard.radio.Radio
 import com.fand1l.radioguard.radio.Snapshot
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
@@ -89,6 +90,44 @@ class PrefsTest {
         prefs.restoreDone()
         prefs.enableGuard(before)
         assertNull(prefs.snapshot().nfcOn)
+    }
+
+    @Test
+    fun `only location is allowed by default`() = runBlocking {
+        assertEquals(setOf(Radio.LOCATION), prefs().current().allowed)
+    }
+
+    @Test
+    fun `exceptions can be added and removed`() = runBlocking {
+        val prefs = prefs()
+        prefs.setAllowed(Radio.BLUETOOTH, true)
+        assertEquals(setOf(Radio.BLUETOOTH, Radio.LOCATION), prefs.current().allowed)
+        prefs.setAllowed(Radio.LOCATION, false)
+        prefs.setAllowed(Radio.BLUETOOTH, false)
+        assertTrue(prefs.current().allowed.isEmpty())
+    }
+
+    @Test
+    fun `wifi cannot become an exception`() = runBlocking {
+        val prefs = prefs()
+        prefs.setAllowed(Radio.WIFI, true)
+        assertEquals(Radio.DEFAULT_ALLOWED, prefs.current().allowed)
+    }
+
+    @Test
+    fun `turning off without restore leaves nothing to restore`() = runBlocking {
+        val prefs = prefs()
+        prefs.enableGuard(before)
+        prefs.disableGuard(restore = false)
+        assertFalse(prefs.current().guardOn)
+        assertFalse(prefs.current().restorePending)
+    }
+
+    @Test
+    fun `location state before is remembered`() = runBlocking {
+        val prefs = prefs()
+        prefs.enableGuard(Snapshot(locationOn = true))
+        assertEquals(true, prefs.snapshot().locationOn)
     }
 
     @Test

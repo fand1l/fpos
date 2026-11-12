@@ -1,6 +1,10 @@
 package com.fand1l.radioguard.radio
 
-enum class Radio(val critical: Boolean = true) {
+/**
+ * [allowable] — пункт можна дозволити як виняток. Wi-Fi має власні налаштування.
+ * [emits] — пункт сам випромінює. GPS лише приймає сигнал супутників.
+ */
+enum class Radio(val critical: Boolean = true, val allowable: Boolean = true, val emits: Boolean = true) {
     CELLULAR,
 
     // У режимі польоту модем вимкнений, тож самі мобільні дані нічого не випромінюють.
@@ -11,15 +15,24 @@ enum class Radio(val critical: Boolean = true) {
     HOTSPOT,
     UWB,
     THREAD,
-    WIFI,
-    WIFI_NETWORK,
+    LOCATION(critical = false, emits = false),
+    WIFI(allowable = false),
+    WIFI_NETWORK(allowable = false),
+    ;
+
+    companion object {
+        /** Власник вирішив: GPS потрібен, карти офлайн. Тому геолокація типово дозволена. */
+        val DEFAULT_ALLOWED: Set<Radio> = setOf(LOCATION)
+    }
 }
 
-enum class CheckStatus { OK, VIOLATION, UNKNOWN }
+enum class CheckStatus { OK, VIOLATION, UNKNOWN, ALLOWED }
 
 data class Check(
     val radio: Radio,
     val status: CheckStatus,
+    /** Чи працює пункт зараз. null — невідомо. */
+    val on: Boolean? = null,
     /** true лише для Wi-Fi, коли він має лишатись увімкненим. */
     val wantedOn: Boolean = false,
     val detail: String? = null,
@@ -35,34 +48,48 @@ data class RadioState(
     val nfcOn: Boolean?,
     val hotspotOn: Boolean?,
     val wifiOn: Boolean?,
+    val locationOn: Boolean? = null,
 ) {
-    fun checks(probe: ProbeState?, keepWifi: Boolean, allowedSsid: String): List<Check> = buildList {
-        add(Check(Radio.CELLULAR, mustBeOn(airplaneOn)))
-        add(Check(Radio.MOBILE_DATA, mustBeOff(mobileDataOn)))
-        add(Check(Radio.BLUETOOTH, mustBeOff(bluetoothOn)))
-        add(Check(Radio.BLE_SCAN, mustBeOff(bleScanOn)))
-        if (hasNfc) add(Check(Radio.NFC, mustBeOff(nfcOn)))
-        add(Check(Radio.HOTSPOT, mustBeOff(hotspotOn)))
-        if (probe?.uwbPresent != false) add(Check(Radio.UWB, mustBeOff(probe?.uwbOn)))
-        if (probe?.threadPresent != false) add(Check(Radio.THREAD, mustBeOff(probe?.threadOn)))
+    fun checks(
+        probe: ProbeState?,
+        keepWifi: Boolean,
+        allowedSsid: String,
+        allowed: Set<Radio> = emptySet(),
+    ): List<Check> = buildList {
+        fun offCheck(radio: Radio, on: Boolean?) = Check(
+            radio = radio,
+            status = if (radio in allowed) CheckStatus.ALLOWED else mustBeOff(on),
+            on = on,
+        )
+
+        add(offCheck(Radio.CELLULAR, airplaneOn?.not()))
+        add(offCheck(Radio.MOBILE_DATA, mobileDataOn))
+        add(offCheck(Radio.BLUETOOTH, bluetoothOn))
+        add(offCheck(Radio.BLE_SCAN, bleScanOn))
+        if (hasNfc) add(offCheck(Radio.NFC, nfcOn))
+        add(offCheck(Radio.HOTSPOT, hotspotOn))
+        if (probe?.uwbPresent != false) add(offCheck(Radio.UWB, probe?.uwbOn))
+        if (probe?.threadPresent != false) add(offCheck(Radio.THREAD, probe?.threadOn))
+        add(offCheck(Radio.LOCATION, locationOn))
 
         if (keepWifi) {
-            add(Check(Radio.WIFI, mustBeOn(wifiOn), wantedOn = true))
-            val allowed = allowedSsid.trim()
-            if (allowed.isNotEmpty()) add(networkCheck(probe, allowed))
+            add(Check(Radio.WIFI, mustBeOff(wifiOn?.not()), on = wifiOn, wantedOn = true))
+            val wanted = allowedSsid.trim()
+            if (wanted.isNotEmpty()) add(networkCheck(probe, wanted))
         } else {
             // Сканування «завжди доступне» вмикає радіо Wi-Fi навіть при вимкненому Wi-Fi.
             val scanning = probe?.wifiScanAlways == true
-            add(Check(Radio.WIFI, if (scanning) CheckStatus.VIOLATION else mustBeOff(wifiOn)))
+            val on = if (scanning) true else wifiOn
+            add(Check(Radio.WIFI, mustBeOff(on), on = on))
         }
     }
 
-    private fun networkCheck(probe: ProbeState?, allowed: String): Check = when {
+    private fun networkCheck(probe: ProbeState?, wanted: String): Check = when {
         probe?.wifiConnected == null -> Check(Radio.WIFI_NETWORK, CheckStatus.UNKNOWN)
-        probe.wifiConnected == false -> Check(Radio.WIFI_NETWORK, CheckStatus.OK)
-        probe.ssid == null -> Check(Radio.WIFI_NETWORK, CheckStatus.UNKNOWN)
-        probe.ssid == allowed -> Check(Radio.WIFI_NETWORK, CheckStatus.OK, detail = probe.ssid)
-        else -> Check(Radio.WIFI_NETWORK, CheckStatus.VIOLATION, detail = probe.ssid)
+        probe.wifiConnected == false -> Check(Radio.WIFI_NETWORK, CheckStatus.OK, on = false)
+        probe.ssid == null -> Check(Radio.WIFI_NETWORK, CheckStatus.UNKNOWN, on = true)
+        probe.ssid == wanted -> Check(Radio.WIFI_NETWORK, CheckStatus.OK, on = true, detail = probe.ssid)
+        else -> Check(Radio.WIFI_NETWORK, CheckStatus.VIOLATION, on = true, detail = probe.ssid)
     }
 
     fun snapshot(probe: ProbeState?) = Snapshot(
@@ -73,6 +100,7 @@ data class RadioState(
         nfcOn = nfcOn,
         wifiOn = wifiOn,
         uwbOn = probe?.uwbOn,
+        locationOn = locationOn,
     )
 }
 
@@ -96,19 +124,18 @@ data class Snapshot(
     val nfcOn: Boolean? = null,
     val wifiOn: Boolean? = null,
     val uwbOn: Boolean? = null,
+    val locationOn: Boolean? = null,
 )
 
 fun List<Check>.violations(): Set<Radio> =
     filter { it.status == CheckStatus.VIOLATION }.mapTo(linkedSetOf()) { it.radio }
 
+/** Дозволені винятки, які зараз працюють. */
+fun List<Check>.allowedAndOn(): List<Radio> =
+    filter { it.status == CheckStatus.ALLOWED && it.on == true }.map { it.radio }
+
 private fun mustBeOff(on: Boolean?) = when (on) {
     null -> CheckStatus.UNKNOWN
     true -> CheckStatus.VIOLATION
     false -> CheckStatus.OK
-}
-
-private fun mustBeOn(on: Boolean?) = when (on) {
-    null -> CheckStatus.UNKNOWN
-    true -> CheckStatus.OK
-    false -> CheckStatus.VIOLATION
 }

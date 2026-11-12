@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.pm.ServiceInfo
 import android.database.ContentObserver
+import android.location.LocationManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -227,7 +228,7 @@ class GuardService : Service() {
             // Одна дія користувача дає кілька подій поспіль; чекаємо, поки стан устоїться.
             delay(DEBOUNCE_MS)
         }
-        finish()
+        finish(wasGuarding = announced)
     }
 
     /**
@@ -304,7 +305,7 @@ class GuardService : Service() {
             PrivilegedShell.exec(Lockdown.setupScript(packageName))
             setupDone = true
         }
-        if (slowCycleDue()) runSlowCycle()
+        if (slowCycleDue()) runSlowCycle(settings)
 
         var checks = currentChecks(settings)
         val violations = checks.violations()
@@ -321,7 +322,7 @@ class GuardService : Service() {
             wakeLock.acquire(ENFORCE_WAKE_MS)
             enforce(violations, settings)
             delay(SETTLE_MS)
-            runSlowCycle()
+            runSlowCycle(settings)
 
             checks = currentChecks(settings)
             val remaining = checks.violations()
@@ -341,18 +342,18 @@ class GuardService : Service() {
     }
 
     private fun currentChecks(settings: GuardSettings): List<Check> =
-        reader.read(softApSeen).checks(probe, settings.keepWifi, settings.allowedSsid)
+        reader.read(softApSeen).checks(probe, settings.keepWifi, settings.allowedSsid, settings.allowed)
 
     private fun slowCycleDue(): Boolean {
         val sinceLast = SystemClock.elapsedRealtime() - lastSlowAt
         return probe == null || sinceLast >= SLOW_CYCLE_MS || (wifiChanged && sinceLast >= MIN_PROBE_GAP_MS)
     }
 
-    private suspend fun runSlowCycle() {
+    private suspend fun runSlowCycle(settings: GuardSettings) {
         wifiChanged = false
-        probe = ShellProbe.parse(PrivilegedShell.exec(Lockdown.slowScript()).output)
+        probe = ShellProbe.parse(PrivilegedShell.exec(Lockdown.slowScript(settings.allowed)).output)
         // Наосліп: стан точки доступу читаємо без прав і не можемо на нього цілком покладатись.
-        stopHotspot()
+        if (Radio.HOTSPOT !in settings.allowed) stopHotspot()
         lastSlowAt = SystemClock.elapsedRealtime()
     }
 
@@ -422,7 +423,8 @@ class GuardService : Service() {
         notifier.showStatus(text)
     }
 
-    private suspend fun finish() {
+    /** [wasGuarding] — вартовий справді стежив; інакше службу будили лише щоб повернути стан. */
+    private suspend fun finish(wasGuarding: Boolean) {
         GuardState.publish(null)
         val settings = try {
             prefs.current()
@@ -431,6 +433,7 @@ class GuardService : Service() {
         }
         // Режим могли ввімкнути знову, поки цикл завершувався: тоді повертати нічого не треба.
         if (settings == null || settings.guardOn || !settings.restorePending) {
+            if (wasGuarding && settings?.guardOn == false) GuardState.log(getString(R.string.log_stopped_keep_off))
             // Тривогу «не вдалося ввімкнути» користувач має побачити й після зупинки служби.
             if (!enableFailed) notifier.clearAlarm()
             enableFailed = false
@@ -476,6 +479,7 @@ class GuardService : Service() {
             addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION)
             addAction(RadioReader.ACTION_WIFI_AP_STATE_CHANGED)
             addAction(RadioReader.ACTION_TETHER_STATE_CHANGED)
+            addAction(LocationManager.MODE_CHANGED_ACTION)
         }
         // Ці оголошення надсилають і системні процеси з іншим uid (Bluetooth, NFC),
         // тому приймач відкритий. Підробити їх застосунки не можуть: дії захищені системою.

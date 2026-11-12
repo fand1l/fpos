@@ -17,6 +17,7 @@ object Lockdown {
         if (Radio.HOTSPOT in violations) add("cmd wifi stop-softap")
         if (Radio.UWB in violations) add("cmd uwb disable-uwb")
         if (Radio.THREAD in violations) add("cmd thread_network disable")
+        if (Radio.LOCATION in violations) add("cmd location set-location-enabled false")
 
         if (keepWifi) {
             if (Radio.CELLULAR in violations) {
@@ -33,14 +34,14 @@ object Lockdown {
     }.joinToString("\n")
 
     /**
-     * Раз на 30 с. Стан Thread прочитати нічим, тому його вимикаємо наосліп;
-     * UWB і Wi-Fi лише читаємо. Wi-Fi стоїть останнім: назву мережі задає чужий роутер,
-     * і вона не повинна мати змоги підробити розділи, що йдуть перед нею.
+     * Раз на 30 с. Стан Thread прочитати нічим, тому його вимикаємо наосліп — якщо він
+     * не дозволений. UWB і Wi-Fi лише читаємо. Wi-Fi стоїть останнім: назву мережі задає
+     * чужий роутер, і вона не повинна мати змоги підробити розділи, що йдуть перед нею.
      */
-    fun slowScript(): String = listOf(
-        section(SECTION_THREAD, "cmd thread_network disable"),
-        probeScript(),
-    ).joinToString("\n")
+    fun slowScript(allowed: Set<Radio>): String = buildList {
+        if (Radio.THREAD !in allowed) add(section(SECTION_THREAD, "cmd thread_network disable"))
+        add(probeScript())
+    }.joinToString("\n")
 
     /** Нічого не змінює, лише читає. */
     fun probeScript(): String = listOf(
@@ -76,6 +77,7 @@ object Lockdown {
             add("sleep 1")
         }
         if (snapshot.bluetoothOn == true) add("svc bluetooth enable")
+        if (snapshot.locationOn == true) add("cmd location set-location-enabled true")
         when (snapshot.wifiOn) {
             true -> add("cmd wifi set-wifi-enabled enabled")
             false -> add("cmd wifi set-wifi-enabled disabled")

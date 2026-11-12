@@ -7,7 +7,7 @@ import android.service.quicksettings.TileService
 import com.fand1l.radioguard.App
 import com.fand1l.radioguard.MainActivity
 import com.fand1l.radioguard.R
-import com.fand1l.radioguard.guard.GuardService
+import com.fand1l.radioguard.guard.GuardRequest
 import com.fand1l.radioguard.guard.GuardSummary
 import com.fand1l.radioguard.guard.QuickAction
 import com.fand1l.radioguard.guard.QuickState
@@ -51,13 +51,9 @@ class GuardTileService : TileService() {
         }
     }
 
+    /** Підтвердження показує застосунок, тому спершу треба розблокувати телефон. */
     private fun act(action: QuickAction) {
-        when (action) {
-            // Увімкнути можна й на заблокованому екрані: це безпечний напрямок.
-            QuickAction.TURN_ON -> GuardService.enable(this)
-            QuickAction.OPEN_APP -> whenUnlocked { openApp(confirmOff = false) }
-            QuickAction.CONFIRM_OFF -> whenUnlocked { openApp(confirmOff = true) }
-        }
+        whenUnlocked { openApp(action.request) }
     }
 
     private fun whenUnlocked(block: () -> Unit) {
@@ -66,12 +62,12 @@ class GuardTileService : TileService() {
 
     // Стару версію виклику Android 14+ забороняє, нової до Android 14 немає.
     @SuppressLint("StartActivityAndCollapseDeprecated")
-    private fun openApp(confirmOff: Boolean) {
+    private fun openApp(request: GuardRequest?) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            startActivityAndCollapse(MainActivity.pendingIntent(this, confirmOff))
+            startActivityAndCollapse(MainActivity.pendingIntent(this, request))
         } else {
             @Suppress("DEPRECATION")
-            startActivityAndCollapse(MainActivity.intent(this, confirmOff))
+            startActivityAndCollapse(MainActivity.intent(this, request))
         }
     }
 
@@ -84,7 +80,7 @@ class GuardTileService : TileService() {
             when (state.summary) {
                 GuardSummary.OFF -> if (state.shizukuReady) R.string.quick_off else R.string.quick_no_shizuku
                 GuardSummary.STARTING -> R.string.quick_starting
-                GuardSummary.OK -> R.string.quick_ok
+                GuardSummary.OK -> if (state.exceptionsOn) R.string.quick_ok_exceptions else R.string.quick_ok
                 GuardSummary.VIOLATION -> R.string.quick_violation
                 GuardSummary.NO_SHELL -> R.string.quick_no_shell
             },

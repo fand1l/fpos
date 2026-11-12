@@ -14,6 +14,7 @@ val Radio.labelRes: Int
         Radio.HOTSPOT -> R.string.radio_hotspot
         Radio.UWB -> R.string.radio_uwb
         Radio.THREAD -> R.string.radio_thread
+        Radio.LOCATION -> R.string.radio_location
         Radio.WIFI -> R.string.radio_wifi
         Radio.WIFI_NETWORK -> R.string.radio_wifi_network
     }

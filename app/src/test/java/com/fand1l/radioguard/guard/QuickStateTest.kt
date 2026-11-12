@@ -4,6 +4,8 @@ import com.fand1l.radioguard.radio.Check
 import com.fand1l.radioguard.radio.CheckStatus
 import com.fand1l.radioguard.radio.Radio
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class QuickStateTest {
@@ -12,19 +14,41 @@ class QuickStateTest {
     private val loud = quiet + Check(Radio.BLUETOOTH, CheckStatus.VIOLATION)
 
     @Test
-    fun `one tap only ever turns the mode on`() {
-        assertEquals(QuickAction.TURN_ON, quickAction(guardOn = false, shizukuReady = true))
+    fun `turning on goes through the confirmation`() {
+        assertEquals(QuickAction.CONFIRM_ON, quickAction(guardOn = false, shizukuReady = true))
+        assertEquals(GuardRequest.TURN_ON, QuickAction.CONFIRM_ON.request)
     }
 
     @Test
     fun `turning off always goes through the confirmation, with or without shizuku`() {
         assertEquals(QuickAction.CONFIRM_OFF, quickAction(guardOn = true, shizukuReady = true))
         assertEquals(QuickAction.CONFIRM_OFF, quickAction(guardOn = true, shizukuReady = false))
+        assertEquals(GuardRequest.TURN_OFF, QuickAction.CONFIRM_OFF.request)
+    }
+
+    @Test
+    fun `a request is confirmed only when it would change something`() {
+        assertEquals(GuardRequest.TURN_ON, confirmationFor(GuardRequest.TURN_ON, guardOn = false))
+        assertEquals(null, confirmationFor(GuardRequest.TURN_ON, guardOn = true))
+        assertEquals(GuardRequest.TURN_OFF, confirmationFor(GuardRequest.TURN_OFF, guardOn = true))
+        assertEquals(null, confirmationFor(GuardRequest.TURN_OFF, guardOn = false))
+        assertEquals(null, confirmationFor(null, guardOn = true))
+    }
+
+    @Test
+    fun `only emitting exceptions that are on count for the widget`() {
+        val gps = Check(Radio.LOCATION, CheckStatus.ALLOWED, on = true)
+        val btOff = Check(Radio.BLUETOOTH, CheckStatus.ALLOWED, on = false)
+        val btOn = Check(Radio.BLUETOOTH, CheckStatus.ALLOWED, on = true)
+        assertFalse(exceptionsOn(listOf(gps, btOff)))
+        assertTrue(exceptionsOn(listOf(gps, btOn)))
+        assertFalse(exceptionsOn(null))
     }
 
     @Test
     fun `without shizuku a tap opens the app instead of pretending to turn on`() {
         assertEquals(QuickAction.OPEN_APP, quickAction(guardOn = false, shizukuReady = false))
+        assertEquals(null, QuickAction.OPEN_APP.request)
     }
 
     @Test

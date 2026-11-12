@@ -74,7 +74,7 @@ class Notifier(private val context: Context) {
         manager.cancel(ID_ALARM)
     }
 
-    private fun openApp(): PendingIntent = MainActivity.pendingIntent(context, confirmOff = false)
+    private fun openApp(): PendingIntent = MainActivity.pendingIntent(context, request = null)
 
     companion object {
         const val ID_STATUS = 1

@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fand1l.radioguard.guard.GuardRequest
 import com.fand1l.radioguard.quick.GuardTileService
 import com.fand1l.radioguard.quick.GuardWidget
 import com.fand1l.radioguard.shizuku.PrivilegedShell
@@ -37,19 +38,19 @@ import com.fand1l.radioguard.ui.RadioGuardTheme
 
 class MainActivity : ComponentActivity() {
 
-    /** Плитка чи віджет попросили підтвердити вимкнення режиму. */
-    private var confirmOff by mutableStateOf(false)
+    /** Плитка чи віджет попросили змінити режим; підтвердження покаже екран. */
+    private var intentRequest by mutableStateOf<GuardRequest?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        // Після повороту екрана той самий intent приходить знову; питати вдруге не треба.
-        if (savedInstanceState == null) confirmOff = intent.asksToConfirmOff()
+        // Після повороту екрана той самий intent приходить знову; запит уже у ViewModel.
+        if (savedInstanceState == null) intentRequest = intent.request()
         setContent {
             RadioGuardTheme {
                 MainRoute(
-                    confirmOff = confirmOff,
-                    onConfirmOffHandled = { confirmOff = false },
+                    intentRequest = intentRequest,
+                    onIntentRequestTaken = { intentRequest = null },
                 )
             }
         }
@@ -57,23 +58,34 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent.asksToConfirmOff()) confirmOff = true
+        intent.request()?.let { intentRequest = it }
     }
 
-    private fun Intent.asksToConfirmOff(): Boolean = action == ACTION_CONFIRM_OFF
+    private fun Intent.request(): GuardRequest? = when (action) {
+        ACTION_CONFIRM_ON -> GuardRequest.TURN_ON
+        ACTION_CONFIRM_OFF -> GuardRequest.TURN_OFF
+        else -> null
+    }
 
     companion object {
+        private const val ACTION_CONFIRM_ON = "com.fand1l.radioguard.action.CONFIRM_ON"
         private const val ACTION_CONFIRM_OFF = "com.fand1l.radioguard.action.CONFIRM_OFF"
 
-        fun intent(context: Context, confirmOff: Boolean): Intent =
+        fun intent(context: Context, request: GuardRequest?): Intent =
             Intent(context, MainActivity::class.java)
-                .setAction(if (confirmOff) ACTION_CONFIRM_OFF else Intent.ACTION_MAIN)
+                .setAction(
+                    when (request) {
+                        GuardRequest.TURN_ON -> ACTION_CONFIRM_ON
+                        GuardRequest.TURN_OFF -> ACTION_CONFIRM_OFF
+                        null -> Intent.ACTION_MAIN
+                    },
+                )
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
-        fun pendingIntent(context: Context, confirmOff: Boolean): PendingIntent = PendingIntent.getActivity(
+        fun pendingIntent(context: Context, request: GuardRequest?): PendingIntent = PendingIntent.getActivity(
             context,
-            if (confirmOff) 1 else 0,
-            intent(context, confirmOff),
+            request?.ordinal?.plus(1) ?: 0,
+            intent(context, request),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
     }
@@ -81,12 +93,19 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun MainRoute(
-    confirmOff: Boolean,
-    onConfirmOffHandled: () -> Unit,
+    intentRequest: GuardRequest?,
+    onIntentRequestTaken: () -> Unit,
     viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory),
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
+    LaunchedEffect(intentRequest) {
+        if (intentRequest != null) {
+            viewModel.onRequest(intentRequest)
+            onIntentRequestTaken()
+        }
+    }
 
     var notificationsAllowed by remember { mutableStateOf(context.notificationsEnabled()) }
     LifecycleResumeEffect(Unit) {
@@ -113,11 +132,9 @@ private fun MainRoute(
     MainScreen(
         state = state,
         notificationsAllowed = notificationsAllowed,
-        confirmOff = confirmOff,
         canAddTile = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
         canAddWidget = remember { context.canPinWidget() },
         actions = viewModel,
-        onConfirmOffHandled = onConfirmOffHandled,
         onOpenShizuku = { context.openShizuku() },
         onOpenNotificationSettings = { context.openNotificationSettings() },
         onAddTile = { context.requestAddTile() },

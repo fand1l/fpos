@@ -35,12 +35,16 @@
     <string name="radio_hotspot">Точка доступу</string>
     <string name="radio_uwb">UWB</string>
     <string name="radio_thread">Thread</string>
+    <string name="radio_location">Геолокація (GPS)</string>
     <string name="radio_wifi">Wi-Fi</string>
     <string name="radio_wifi_network">Wi-Fi мережа</string>
 
     <string name="check_off">вимкнено</string>
     <string name="check_on">УВІМКНЕНО</string>
     <string name="check_unknown">невідомо</string>
+    <string name="check_allowed">дозволено</string>
+    <string name="check_allowed_on">увімкнено · дозволено</string>
+    <string name="check_allowed_off">вимкнено · дозволено</string>
     <string name="check_cellular_off">режим польоту</string>
     <string name="check_cellular_on">УВІМКНЕНО</string>
     <string name="check_wifi_allowed">увімкнено (дозволено)</string>
@@ -63,12 +67,14 @@
     <string name="log_network_dropped">Чужу мережу «%1$s» не знайдено серед збережених. Перезапускаю Wi-Fi.</string>
     <string name="log_hotspot_error">Точку доступу не вдалося зупинити: %1$s</string>
     <string name="log_enable_failed">Режим тиші НЕ ввімкнено. %1$s</string>
+    <string name="log_stopped_keep_off">Режим тиші вимкнено. Радіо лишаються вимкненими.</string>
     <string name="log_settings_unreadable">Не читаються налаштування. Працюю з типовими.</string>
 
     <string name="guard_title">Режим тиші</string>
     <string name="guard_off">Вимкнено. Зв\'язок не контролюється.</string>
     <string name="guard_starting">Вмикається…</string>
     <string name="guard_ok">Усе вимкнено. Вартовий стежить.</string>
+    <string name="guard_ok_exceptions">Вартовий стежить. Дозволено й увімкнено: %1$s.</string>
     <string name="guard_violation">Є порушення. Дивіться нижче.</string>
     <string name="guard_no_shell">Зв\'язок НЕ контролюється: немає Shizuku.</string>
     <string name="guard_needs_shell">Спочатку запустіть Shizuku і дайте доступ.</string>
@@ -89,22 +95,39 @@
     <string name="restore_text">Shizuku не працював, коли ви вимкнули режим. Запустіть Shizuku і натисніть кнопку. Або ввімкніть потрібне вручну.</string>
     <string name="restore_retry">Повернути стан</string>
 
+    <string name="confirm_on_title">Увімкнути режим тиші?</string>
+    <string name="confirm_on_silence">Буде вимкнено: %1$s.</string>
+    <string name="confirm_on_nothing">Нічого не буде вимкнено: усі пункти дозволені.</string>
+    <string name="confirm_on_allowed">Винятки, їх не вимикатиму: %1$s.</string>
+    <string name="confirm_on_wifi">Wi-Fi лишається ввімкненим.</string>
+    <string name="confirm_on_no_shell">Shizuku ще не готовий. Кнопка запрацює, щойно він підключиться.</string>
+    <string name="confirm_on_yes">Увімкнути</string>
+    <string name="confirm_cancel">Скасувати</string>
+
     <string name="confirm_off_title">Вимкнути режим тиші?</string>
-    <string name="confirm_off_text">Радіо повернуться до стану, який був до ввімкнення. Вартовий перестане стежити.</string>
+    <string name="confirm_off_text">Вартовий перестане стежити.</string>
+    <string name="confirm_off_restore_list">Якщо повернути як було, знову ввімкнеться: %1$s.</string>
+    <string name="confirm_off_keep">Вимкнути, радіо не вмикати</string>
+    <string name="confirm_off_restore">Вимкнути й повернути як було</string>
     <string name="confirm_off_yes">Вимкнути</string>
-    <string name="confirm_off_no">Скасувати</string>
 
     <string name="quick_off">Вимкнено</string>
     <string name="quick_off_hint">Вимкнено. Торкніться.</string>
     <string name="quick_no_shizuku">Немає Shizuku</string>
     <string name="quick_starting">Вмикається…</string>
     <string name="quick_ok">Усе вимкнено</string>
+    <string name="quick_ok_exceptions">Є винятки</string>
     <string name="quick_violation">Є порушення!</string>
     <string name="quick_no_shell">НЕ контролюється!</string>
-    <string name="widget_description">Вмикає «Режим тиші» одним дотиком і показує, чи все вимкнено.</string>
+    <string name="widget_description">Показує, чи все вимкнено, і відкриває підтвердження «Режиму тиші».</string>
+
+    <string name="section_exceptions">Винятки</string>
+    <string name="exceptions_hint">Дозволений пункт вартовий не вимикає. Вмикайте його самі в налаштуваннях телефона. Решта лишається вимкненою.</string>
+    <string name="exception_allowed">Дозволено. Вартовий не чіпає.</string>
+    <string name="exception_blocked">Вартовий вимикає.</string>
 
     <string name="section_quick">Швидкий доступ</string>
-    <string name="quick_hint">Плитка і віджет вмикають режим одним дотиком. Вимкнення завжди питає підтвердження.</string>
+    <string name="quick_hint">Плитка і віджет показують стан. Дотик відкриває підтвердження: увімкнути чи вимкнути режим.</string>
     <string name="quick_add_tile">Додати плитку</string>
     <string name="quick_add_widget">Додати віджет</string>
     <string name="quick_tile_manual">Плитку можна додати вручну: відкрийте швидкі налаштування і натисніть олівець.</string>
@@ -122,8 +145,8 @@
     <string name="setting_ssid_save">Зберегти</string>
 
     <string name="onboarding_title">Як це працює</string>
-    <string name="onboarding_1">«Режим тиші» вимикає стільникову мережу, Bluetooth, NFC, точку доступу, UWB і Thread. Wi-Fi лишається.</string>
-    <string name="onboarding_2">Вартовий стежить далі. Якщо щось увімкнеться — вимкне знову за кілька секунд.</string>
+    <string name="onboarding_1">«Режим тиші» вимикає стільникову мережу, Bluetooth, NFC, точку доступу, UWB і Thread. Wi-Fi і GPS лишаються.</string>
+    <string name="onboarding_2">Вартовий стежить далі. Якщо щось увімкнеться — вимкне знову за кілька секунд. Окремі пункти можна дозволити у «Винятках».</string>
     <string name="onboarding_3">Потрібен Shizuku. Після кожного перезавантаження телефона його треба запускати знову. Для цього потрібен Wi-Fi.</string>
     <string name="onboarding_4">Якщо Shizuku не працює, ви побачите тривогу «Зв\'язок НЕ контролюється».</string>
     <string name="onboarding_5">Сам Wi-Fi теж випромінює. Програмне вимкнення слабше за фізичне: SIM-карти вимикайте окремо.</string>

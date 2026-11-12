@@ -66,6 +66,22 @@ class LockdownTest {
         assertTrue("cmd wifi stop-softap" in script)
         assertTrue("cmd uwb disable-uwb" in script)
         assertTrue("cmd thread_network disable" in script)
+        assertTrue("cmd location set-location-enabled false" in script)
+    }
+
+    @Test
+    fun `allowed thread is not switched off blindly`() {
+        assertTrue(Lockdown.slowScript(emptySet()).contains("cmd thread_network disable"))
+        val script = Lockdown.slowScript(setOf(Radio.THREAD))
+        assertFalse(script.contains("thread_network"))
+        assertTrue(script.contains("cmd uwb status"))
+        assertTrue(script.contains("cmd wifi status"))
+    }
+
+    @Test
+    fun `restore turns location back on only if it was on`() {
+        assertTrue(Lockdown.restoreScript(Snapshot(locationOn = true)).contains("cmd location set-location-enabled true"))
+        assertFalse(Lockdown.restoreScript(Snapshot(locationOn = false)).contains("location"))
     }
 
     @Test
@@ -138,7 +154,7 @@ class LockdownTest {
 
     @Test
     fun `slow script asks about wifi last`() {
-        val script = Lockdown.slowScript()
+        val script = Lockdown.slowScript(emptySet())
         assertTrue(script.indexOf("#thread") < script.indexOf("#uwb"))
         assertTrue(script.indexOf("#uwb") < script.indexOf("#wifi"))
     }
