@@ -218,7 +218,8 @@ Shizuku через ADB працює як користувач shell (uid 2000). 
 - Gradle 8.9 (є wrapper), AGP 8.7.3, Kotlin 2.0.21, Compose BOM 2024.10.01, Shizuku API 13.1.5.
 - Workflow `.github/workflows/build.yml` (на кожен push і вручну): тести + lint → `./gradlew assembleRelease` → перевірка, що в APK немає `INTERNET` → артефакт `radioguard-apk`.
 - R8 вимкнено (APK ≈ 20 МБ): Shizuku створює `ShellService` за іменем класу, а перевірити обфускований APK без телефона нічим.
-- Підпис: якщо в GitHub Secrets є `RADIOGUARD_KEYSTORE_BASE64`, `RADIOGUARD_KEYSTORE_PASSWORD`, `RADIOGUARD_KEY_ALIAS`, `RADIOGUARD_KEY_PASSWORD` — release підписується цим ключем, і оновлення ставляться «поверх» (`versionCode` = номер прогону CI). Без секретів — debug-ключ, різний у кожній збірці. Як додати секрети — `README.md`.
+- Підпис: якщо в GitHub Secrets є `RADIOGUARD_KEYSTORE_BASE64` і `RADIOGUARD_KEYSTORE_PASSWORD` — release підписується цим ключем, і оновлення ставляться «поверх» (`versionCode` = номер прогону CI). Без секретів — тимчасовий ключ, різний у кожній збірці: тоді нова збірка не стає поверх старої («Додаток не встановлено»), стару треба спершу видалити. Як додати секрети — `README.md`.
+- Артефакт містить файл `radioguard-0.1-<номер збірки>.apk`; на сторінці прогону видно, яким ключем він підписаний.
 - Лише для тестів (у APK не потрапляють): Robolectric 4.14.1 і `compose-ui-test-junit4`. Вони запускають екран в емульованому Android 15, щоб упіймати падіння на старті до встановлення на телефон.
 - Версії з цього розділу перевірено: усі є на Google Maven / Maven Central. Є значно новіші (AGP 9.x, Compose BOM 2026.x) — оновлення не робили, щоб не відходити від плану.
 

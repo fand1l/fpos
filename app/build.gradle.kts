@@ -23,10 +23,13 @@ android {
     signingConfigs {
         if (releaseKeystore != null) {
             create("release") {
+                // Назва ключа і його пароль необов'язкові: у сховищі PKCS12 пароль ключа
+                // збігається з паролем сховища, тож досить двох секретів замість чотирьох.
+                val password = System.getenv("RADIOGUARD_KEYSTORE_PASSWORD")
                 storeFile = file(releaseKeystore)
-                storePassword = System.getenv("RADIOGUARD_KEYSTORE_PASSWORD")
-                keyAlias = System.getenv("RADIOGUARD_KEY_ALIAS")
-                keyPassword = System.getenv("RADIOGUARD_KEY_PASSWORD")
+                storePassword = password
+                keyAlias = System.getenv("RADIOGUARD_KEY_ALIAS")?.takeIf { it.isNotBlank() } ?: "radioguard"
+                keyPassword = System.getenv("RADIOGUARD_KEY_PASSWORD")?.takeIf { it.isNotBlank() } ?: password
             }
         }
     }

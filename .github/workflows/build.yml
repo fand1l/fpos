@@ -24,16 +24,16 @@ jobs:
           java-version: 17
           cache: gradle
 
-      # Без секретів APK підписується debug-ключем: ставиться, але не оновлюється «поверх».
+      # Без секретів APK підписується тимчасовим ключем: ставиться, але не оновлюється «поверх».
       - name: Ключ підпису
         env:
           KEYSTORE_BASE64: ${{ secrets.RADIOGUARD_KEYSTORE_BASE64 }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
-            echo "RADIOGUARD_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.p12"
+            echo "RADIOGUARD_KEYSTORE_FILE=$RUNNER_TEMP/release.p12" >> "$GITHUB_ENV"
           else
-            echo "::warning::Секрет RADIOGUARD_KEYSTORE_BASE64 не задано. APK підписано debug-ключем."
+            echo "::warning::Секрет RADIOGUARD_KEYSTORE_BASE64 не задано. APK підписано тимчасовим ключем."
           fi
 
       - name: Тести і lint
@@ -57,8 +57,28 @@ jobs:
             exit 1
           fi
 
+      # Номер збірки в назві файла: у «Завантаженнях» видно, яка версія свіжіша.
+      # Відбиток ключа в підсумку: видно, чи ця збірка стане «поверх» попередньої.
+      - name: Назва файла і підпис
+        run: |
+          apk="radioguard-0.1-${{ github.run_number }}.apk"
+          cp app/build/outputs/apk/release/app-release.apk "$apk"
+          echo "APK_FILE=$apk" >> "$GITHUB_ENV"
+          apksigner=$(ls "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n 1)
+          fingerprint=$("$apksigner" verify --print-certs "$apk" | grep "SHA-256" | head -n 1 | sed 's/.*: //')
+          {
+            echo "### $apk"
+            if [ -n "$RADIOGUARD_KEYSTORE_FILE" ]; then
+              echo "Підпис: **постійний ключ**. Ставиться поверх попередніх збірок із тим самим ключем."
+            else
+              echo "Підпис: **тимчасовий ключ**. Поверх іншої збірки НЕ стане: спершу вимкніть «Режим тиші» і видаліть стару версію."
+            fi
+            echo
+            echo "Відбиток ключа (SHA-256): \`$fingerprint\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - uses: actions/upload-artifact@v5
         with:
           name: radioguard-apk
-          path: app/build/outputs/apk/release/app-release.apk
+          path: ${{ env.APK_FILE }}
           if-no-files-found: error
