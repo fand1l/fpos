@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import com.fand1l.radioguard.MainActivity
 import com.fand1l.radioguard.R
 
@@ -75,12 +74,7 @@ class Notifier(private val context: Context) {
         manager.cancel(ID_ALARM)
     }
 
-    private fun openApp(): PendingIntent = PendingIntent.getActivity(
-        context,
-        0,
-        Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-    )
+    private fun openApp(): PendingIntent = MainActivity.pendingIntent(context, confirmOff = false)
 
     companion object {
         const val ID_STATUS = 1

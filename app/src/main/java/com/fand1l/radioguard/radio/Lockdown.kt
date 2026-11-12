@@ -60,10 +60,13 @@ object Lockdown {
         "cmd wifi set-wifi-enabled enabled",
     ).joinToString("\n")
 
-    /** Без цього система може не дати службі піднятись у фоні після вбивства процесу. */
+    /**
+     * Без цього система може не дати службі піднятись у фоні: після вбивства процесу
+     * або з плитки чи віджета. Тому виняток лишається й після вимкнення режиму.
+     */
     fun setupScript(packageName: String): String = "cmd deviceidle whitelist +$packageName"
 
-    fun restoreScript(snapshot: Snapshot, packageName: String): String = buildList {
+    fun restoreScript(snapshot: Snapshot): String = buildList {
         if (snapshot.uwbOn == true) add("cmd uwb enable-uwb")
         if (snapshot.nfcOn == true) add("svc nfc enable")
         if (snapshot.bleScanOn == true) add("settings put global ble_scan_always_enabled 1")
@@ -78,7 +81,6 @@ object Lockdown {
             false -> add("cmd wifi set-wifi-enabled disabled")
             null -> Unit
         }
-        add("cmd deviceidle whitelist -$packageName")
     }.joinToString("\n")
 
     const val SECTION_THREAD = "thread"

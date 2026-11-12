@@ -2,8 +2,13 @@ package com.fand1l.radioguard
 
 import android.Manifest
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.StatusBarManager
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
@@ -23,6 +28,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.fand1l.radioguard.quick.GuardTileService
+import com.fand1l.radioguard.quick.GuardWidget
 import com.fand1l.radioguard.shizuku.PrivilegedShell
 import com.fand1l.radioguard.ui.MainScreen
 import com.fand1l.radioguard.ui.MainViewModel
@@ -30,19 +37,54 @@ import com.fand1l.radioguard.ui.RadioGuardTheme
 
 class MainActivity : ComponentActivity() {
 
+    /** Плитка чи віджет попросили підтвердити вимкнення режиму. */
+    private var confirmOff by mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        // Після повороту екрана той самий intent приходить знову; питати вдруге не треба.
+        if (savedInstanceState == null) confirmOff = intent.asksToConfirmOff()
         setContent {
             RadioGuardTheme {
-                MainRoute()
+                MainRoute(
+                    confirmOff = confirmOff,
+                    onConfirmOffHandled = { confirmOff = false },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.asksToConfirmOff()) confirmOff = true
+    }
+
+    private fun Intent.asksToConfirmOff(): Boolean = action == ACTION_CONFIRM_OFF
+
+    companion object {
+        private const val ACTION_CONFIRM_OFF = "com.fand1l.radioguard.action.CONFIRM_OFF"
+
+        fun intent(context: Context, confirmOff: Boolean): Intent =
+            Intent(context, MainActivity::class.java)
+                .setAction(if (confirmOff) ACTION_CONFIRM_OFF else Intent.ACTION_MAIN)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+
+        fun pendingIntent(context: Context, confirmOff: Boolean): PendingIntent = PendingIntent.getActivity(
+            context,
+            if (confirmOff) 1 else 0,
+            intent(context, confirmOff),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
     }
 }
 
 @Composable
-private fun MainRoute(viewModel: MainViewModel = viewModel()) {
+private fun MainRoute(
+    confirmOff: Boolean,
+    onConfirmOffHandled: () -> Unit,
+    viewModel: MainViewModel = viewModel(factory = MainViewModel.Factory),
+) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
@@ -71,9 +113,15 @@ private fun MainRoute(viewModel: MainViewModel = viewModel()) {
     MainScreen(
         state = state,
         notificationsAllowed = notificationsAllowed,
+        confirmOff = confirmOff,
+        canAddTile = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU,
+        canAddWidget = remember { context.canPinWidget() },
         actions = viewModel,
+        onConfirmOffHandled = onConfirmOffHandled,
         onOpenShizuku = { context.openShizuku() },
         onOpenNotificationSettings = { context.openNotificationSettings() },
+        onAddTile = { context.requestAddTile() },
+        onAddWidget = { context.requestPinWidget() },
     )
 }
 
@@ -90,4 +138,22 @@ private fun Context.openNotificationSettings() {
         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
             .putExtra(Settings.EXTRA_APP_PACKAGE, packageName),
     )
+}
+
+private fun Context.requestAddTile() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    getSystemService(StatusBarManager::class.java).requestAddTileService(
+        ComponentName(this, GuardTileService::class.java),
+        getString(R.string.guard_title),
+        Icon.createWithResource(this, R.drawable.ic_stat_guard),
+        mainExecutor,
+    ) { }
+}
+
+private fun Context.canPinWidget(): Boolean =
+    getSystemService(AppWidgetManager::class.java)?.isRequestPinAppWidgetSupported == true
+
+private fun Context.requestPinWidget() {
+    getSystemService(AppWidgetManager::class.java)
+        ?.requestPinAppWidget(ComponentName(this, GuardWidget::class.java), null, null)
 }

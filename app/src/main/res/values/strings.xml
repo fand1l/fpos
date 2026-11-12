@@ -21,6 +21,9 @@
     <string name="alarm_restore_text">Shizuku не працює. Запустіть його і відкрийте застосунок.</string>
     <string name="alarm_service_title">Вартовий не запустився</string>
     <string name="alarm_service_text">Відкрийте застосунок.</string>
+    <string name="alarm_enable_title">Режим тиші НЕ ввімкнено</string>
+    <string name="alarm_enable_no_shell">Shizuku не працює. Запустіть його і спробуйте ще раз.</string>
+    <string name="alarm_enable_no_settings">Не вдалося зберегти налаштування.</string>
     <string name="alarm_settings_title">Не читаються налаштування</string>
     <string name="alarm_settings_text">Вартовий працює з типовими налаштуваннями. Відкрийте застосунок.</string>
 
@@ -59,10 +62,12 @@
     <string name="log_network_forgotten">Чужу мережу «%1$s» забуто.</string>
     <string name="log_network_dropped">Чужу мережу «%1$s» не знайдено серед збережених. Перезапускаю Wi-Fi.</string>
     <string name="log_hotspot_error">Точку доступу не вдалося зупинити: %1$s</string>
+    <string name="log_enable_failed">Режим тиші НЕ ввімкнено. %1$s</string>
     <string name="log_settings_unreadable">Не читаються налаштування. Працюю з типовими.</string>
 
     <string name="guard_title">Режим тиші</string>
     <string name="guard_off">Вимкнено. Зв\'язок не контролюється.</string>
+    <string name="guard_starting">Вмикається…</string>
     <string name="guard_ok">Усе вимкнено. Вартовий стежить.</string>
     <string name="guard_violation">Є порушення. Дивіться нижче.</string>
     <string name="guard_no_shell">Зв\'язок НЕ контролюється: немає Shizuku.</string>
@@ -83,6 +88,26 @@
     <string name="restore_title">Попередній стан не повернуто</string>
     <string name="restore_text">Shizuku не працював, коли ви вимкнули режим. Запустіть Shizuku і натисніть кнопку. Або ввімкніть потрібне вручну.</string>
     <string name="restore_retry">Повернути стан</string>
+
+    <string name="confirm_off_title">Вимкнути режим тиші?</string>
+    <string name="confirm_off_text">Радіо повернуться до стану, який був до ввімкнення. Вартовий перестане стежити.</string>
+    <string name="confirm_off_yes">Вимкнути</string>
+    <string name="confirm_off_no">Скасувати</string>
+
+    <string name="quick_off">Вимкнено</string>
+    <string name="quick_off_hint">Вимкнено. Торкніться.</string>
+    <string name="quick_no_shizuku">Немає Shizuku</string>
+    <string name="quick_starting">Вмикається…</string>
+    <string name="quick_ok">Усе вимкнено</string>
+    <string name="quick_violation">Є порушення!</string>
+    <string name="quick_no_shell">НЕ контролюється!</string>
+    <string name="widget_description">Вмикає «Режим тиші» одним дотиком і показує, чи все вимкнено.</string>
+
+    <string name="section_quick">Швидкий доступ</string>
+    <string name="quick_hint">Плитка і віджет вмикають режим одним дотиком. Вимкнення завжди питає підтвердження.</string>
+    <string name="quick_add_tile">Додати плитку</string>
+    <string name="quick_add_widget">Додати віджет</string>
+    <string name="quick_tile_manual">Плитку можна додати вручну: відкрийте швидкі налаштування і натисніть олівець.</string>
 
     <string name="section_state">Стан зараз</string>
     <string name="section_settings">Налаштування</string>

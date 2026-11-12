@@ -74,6 +74,9 @@ class GuardService : Service() {
     @Volatile
     private var foregroundFailed = false
 
+    @Volatile
+    private var enableRequested = false
+
     // Усе нижче чіпає лише корутина циклу.
     private val backoff = Backoff()
     private var probe: ProbeState? = null
@@ -81,6 +84,8 @@ class GuardService : Service() {
     private var lastSettings: GuardSettings? = null
     private var settingsBroken = false
     private var shellReady: Boolean? = null
+    private var graceDone = false
+    private var enableFailed = false
     private var setupDone = false
     private var firstLock = true
     private var stuck: Set<Radio> = emptySet()
@@ -130,6 +135,7 @@ class GuardService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         enterForeground()
+        if (intent?.action == ACTION_ENABLE) enableRequested = true
         startRequested = true
         if (loop == null) launchLoop()
         poke()
@@ -193,11 +199,21 @@ class GuardService : Service() {
     private suspend fun runGuard() {
         var announced = false
         while (true) {
+            if (enableRequested) {
+                enableRequested = false
+                enable()
+            }
             val settings = readSettings()
             if (!settings.guardOn) break
             if (!announced) {
                 GuardState.log(getString(R.string.log_guard_started))
                 announced = true
+            }
+            if (!graceDone) {
+                // Одразу після старту процесу Shizuku ще не встиг передати binder.
+                // Не здіймаємо тривогу, доки не дали йому на це кілька секунд.
+                PrivilegedShell.awaitReady(STARTUP_GRACE_MS)
+                graceDone = true
             }
             try {
                 tick(settings)
@@ -212,6 +228,45 @@ class GuardService : Service() {
             delay(DEBOUNCE_MS)
         }
         finish()
+    }
+
+    /**
+     * Режим вмикає сама служба: так вона стає foreground у ту мить, коли користувач
+     * торкнувся плитки чи віджета, і система не забороняє запуск із фону.
+     */
+    private suspend fun enable() {
+        val alreadyOn = try {
+            prefs.current().guardOn
+        } catch (e: IOException) {
+            false
+        }
+        if (alreadyOn) return
+
+        GuardState.setEnabling(true)
+        try {
+            if (!PrivilegedShell.awaitReady(STARTUP_GRACE_MS)) throw ShellException("Shizuku не готовий")
+            graceDone = true
+            val before = try {
+                ShellProbe.parse(PrivilegedShell.exec(Lockdown.probeScript()).output)
+            } catch (e: ShellException) {
+                // Без цього знімок просто не знатиме про UWB; режим усе одно вмикаємо.
+                null
+            }
+            prefs.enableGuard(reader.read(softApSeen).snapshot(before))
+            enableFailed = false
+        } catch (e: ShellException) {
+            reportEnableFailure(R.string.alarm_enable_no_shell)
+        } catch (e: IOException) {
+            reportEnableFailure(R.string.alarm_enable_no_settings)
+        } finally {
+            GuardState.setEnabling(false)
+        }
+    }
+
+    private fun reportEnableFailure(reason: Int) {
+        enableFailed = true
+        GuardState.log(getString(R.string.log_enable_failed, getString(reason)))
+        notifier.showAlarm(getString(R.string.alarm_enable_title), getString(reason), ongoing = false)
     }
 
     private suspend fun readSettings(): GuardSettings = try {
@@ -376,7 +431,9 @@ class GuardService : Service() {
         }
         // Режим могли ввімкнути знову, поки цикл завершувався: тоді повертати нічого не треба.
         if (settings == null || settings.guardOn || !settings.restorePending) {
-            notifier.clearAlarm()
+            // Тривогу «не вдалося ввімкнути» користувач має побачити й після зупинки служби.
+            if (!enableFailed) notifier.clearAlarm()
+            enableFailed = false
             return
         }
         showStatus(R.string.status_restoring)
@@ -384,7 +441,8 @@ class GuardService : Service() {
             if (PrivilegedShell.refresh() != PrivilegedShell.Status.READY) {
                 throw ShellException("Shizuku не готовий")
             }
-            PrivilegedShell.exec(Lockdown.restoreScript(prefs.snapshot(), packageName))
+            val script = Lockdown.restoreScript(prefs.snapshot())
+            if (script.isNotEmpty()) PrivilegedShell.exec(script)
             prefs.restoreDone()
             GuardState.log(getString(R.string.log_restored))
             notifier.clearAlarm()
@@ -481,14 +539,27 @@ class GuardService : Service() {
         private const val SLOW_CYCLE_MS = 30_000L
         private const val MIN_PROBE_GAP_MS = 2_000L
         private const val CRASH_RESTART_MS = 3_000L
+        private const val STARTUP_GRACE_MS = 5_000L
+        private const val ACTION_ENABLE = "com.fand1l.radioguard.action.ENABLE"
         private const val EVENT_WAKE_MS = 10_000L
         private const val ENFORCE_WAKE_MS = 30_000L
 
-        /** false — система не дозволила запуск (застосунок у фоні). */
-        fun start(context: Context): Boolean = try {
-            context.startForegroundService(Intent(context, GuardService::class.java))
+        /** Запускає вартового, якщо режим увімкнено, або дає йому повернути стан після вимкнення. */
+        fun start(context: Context): Boolean = launch(context, action = null)
+
+        /** Просить службу ввімкнути режим: зробити знімок стану і почати стежити. */
+        fun enable(context: Context): Boolean = launch(context, ACTION_ENABLE)
+
+        private fun launch(context: Context, action: String?): Boolean = try {
+            context.startForegroundService(Intent(context, GuardService::class.java).setAction(action))
             true
         } catch (e: RuntimeException) {
+            // Система не дозволила запуск із фону. Мовчати не можна: людина думає, що режим працює.
+            Notifier(context).showAlarm(
+                context.getString(R.string.alarm_service_title),
+                context.getString(R.string.alarm_service_text),
+                ongoing = false,
+            )
             false
         }
     }

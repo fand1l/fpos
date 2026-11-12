@@ -79,7 +79,7 @@ class LockdownTest {
             wifiOn = true,
             uwbOn = false,
         )
-        val script = lines(Lockdown.restoreScript(snapshot, "com.example"))
+        val script = lines(Lockdown.restoreScript(snapshot))
         assertEquals(
             listOf(
                 "svc nfc enable",
@@ -88,7 +88,6 @@ class LockdownTest {
                 "sleep 1",
                 "svc bluetooth enable",
                 "cmd wifi set-wifi-enabled enabled",
-                "cmd deviceidle whitelist -com.example",
             ),
             script,
         )
@@ -96,23 +95,27 @@ class LockdownTest {
 
     @Test
     fun `restore leaves airplane mode on if it was on before`() {
-        val script = Lockdown.restoreScript(Snapshot(airplaneOn = true, wifiOn = false), "com.example")
+        val script = Lockdown.restoreScript(Snapshot(airplaneOn = true, wifiOn = false))
         assertFalse(script.contains("airplane-mode"))
         assertTrue(script.contains("cmd wifi set-wifi-enabled disabled"))
     }
 
     @Test
-    fun `restore with an unknown snapshot changes no radio`() {
-        assertEquals(
-            listOf("cmd deviceidle whitelist -com.example"),
-            lines(Lockdown.restoreScript(Snapshot(), "com.example")),
-        )
+    fun `restore with an unknown snapshot does nothing`() {
+        assertEquals("", Lockdown.restoreScript(Snapshot()))
+    }
+
+    @Test
+    fun `restore keeps the battery exemption that lets the tile and widget start the guard`() {
+        val everythingOn = Snapshot(true, true, true, true, true, true, true)
+        assertFalse(Lockdown.restoreScript(everythingOn).contains("deviceidle"))
+        assertEquals("cmd deviceidle whitelist +com.example", Lockdown.setupScript("com.example"))
     }
 
     @Test
     fun `restore never turns the hotspot or thread back on`() {
         val everythingOn = Snapshot(true, true, true, true, true, true, true)
-        val script = Lockdown.restoreScript(everythingOn, "com.example")
+        val script = Lockdown.restoreScript(everythingOn)
         assertFalse(script.contains("softap"))
         assertFalse(script.contains("thread_network"))
     }

@@ -26,16 +26,19 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,6 +57,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.fand1l.radioguard.R
+import com.fand1l.radioguard.guard.GuardSummary
 import com.fand1l.radioguard.guard.JournalEntry
 import com.fand1l.radioguard.radio.Check
 import com.fand1l.radioguard.radio.CheckStatus
@@ -76,26 +80,76 @@ private val StateTextMaxWidth = 180.dp
 fun MainScreen(
     state: MainUiState,
     notificationsAllowed: Boolean,
+    confirmOff: Boolean,
+    canAddTile: Boolean,
+    canAddWidget: Boolean,
     actions: MainActions,
+    onConfirmOffHandled: () -> Unit,
     onOpenShizuku: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onAddTile: () -> Unit,
+    onAddWidget: () -> Unit,
 ) {
     Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
         when {
             !state.loaded -> Unit
             !state.onboardingDone -> Onboarding(onDone = actions::onOnboardingDone)
-            else -> Dashboard(state, notificationsAllowed, actions, onOpenShizuku, onOpenNotificationSettings)
+            else -> Dashboard(
+                state = state,
+                notificationsAllowed = notificationsAllowed,
+                canAddTile = canAddTile,
+                canAddWidget = canAddWidget,
+                actions = actions,
+                onOpenShizuku = onOpenShizuku,
+                onOpenNotificationSettings = onOpenNotificationSettings,
+                onAddTile = onAddTile,
+                onAddWidget = onAddWidget,
+            )
         }
     }
+
+    // Прохання вимкнути прийшло з плитки чи віджета. Якщо режим уже вимкнено, питати нема про що.
+    if (confirmOff && state.loaded) {
+        if (state.guardOn) {
+            ConfirmOffDialog(
+                onConfirm = {
+                    actions.onGuardToggle(false)
+                    onConfirmOffHandled()
+                },
+                onDismiss = onConfirmOffHandled,
+            )
+        } else {
+            LaunchedEffect(Unit) { onConfirmOffHandled() }
+        }
+    }
+}
+
+@Composable
+private fun ConfirmOffDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.confirm_off_title)) },
+        text = { Text(stringResource(R.string.confirm_off_text)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.confirm_off_yes)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.confirm_off_no)) }
+        },
+    )
 }
 
 @Composable
 private fun Dashboard(
     state: MainUiState,
     notificationsAllowed: Boolean,
+    canAddTile: Boolean,
+    canAddWidget: Boolean,
     actions: MainActions,
     onOpenShizuku: () -> Unit,
     onOpenNotificationSettings: () -> Unit,
+    onAddTile: () -> Unit,
+    onAddWidget: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier
@@ -157,6 +211,9 @@ private fun Dashboard(
             )
         }
 
+        item { SectionTitle(stringResource(R.string.section_quick)) }
+        item { QuickAccessCard(canAddTile, canAddWidget, onAddTile, onAddWidget) }
+
         item { SectionTitle(stringResource(R.string.section_journal)) }
         if (state.journal.isEmpty()) {
             item { Hint(stringResource(R.string.journal_empty)) }
@@ -201,6 +258,7 @@ private fun GuardCard(state: MainUiState, onToggle: (Boolean) -> Unit) {
                         when (summary) {
                             GuardSummary.OFF ->
                                 if (state.shizukuReady) R.string.guard_off else R.string.guard_needs_shell
+                            GuardSummary.STARTING -> R.string.guard_starting
                             GuardSummary.OK -> R.string.guard_ok
                             GuardSummary.VIOLATION -> R.string.guard_violation
                             GuardSummary.NO_SHELL -> R.string.guard_no_shell
@@ -404,6 +462,37 @@ private fun SettingsCard(
                 modifier = Modifier.align(Alignment.End),
             ) {
                 Text(stringResource(R.string.setting_ssid_save))
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAccessCard(
+    canAddTile: Boolean,
+    canAddWidget: Boolean,
+    onAddTile: () -> Unit,
+    onAddWidget: () -> Unit,
+) {
+    Card {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(text = stringResource(R.string.quick_hint), style = MaterialTheme.typography.bodyMedium)
+            if (canAddTile) {
+                OutlinedButton(onClick = onAddTile, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.quick_add_tile))
+                }
+            } else {
+                Hint(stringResource(R.string.quick_tile_manual))
+            }
+            if (canAddWidget) {
+                OutlinedButton(onClick = onAddWidget, modifier = Modifier.fillMaxWidth()) {
+                    Text(stringResource(R.string.quick_add_widget))
+                }
             }
         }
     }

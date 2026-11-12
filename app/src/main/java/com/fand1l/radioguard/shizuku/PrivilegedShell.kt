@@ -11,6 +11,7 @@ import com.fand1l.radioguard.shell.IShellService
 import com.fand1l.radioguard.shell.ShellService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,6 +35,7 @@ object PrivilegedShell {
     const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
     private const val PERMISSION_REQUEST_CODE = 1
     private const val BIND_TIMEOUT_MS = 10_000L
+    private const val READY_POLL_MS = 250L
 
     private lateinit var app: Context
 
@@ -83,6 +85,18 @@ object PrivilegedShell {
         val current = readStatus()
         _status.value = current
         return current
+    }
+
+    /**
+     * Після холодного старту процесу Shizuku передає свій binder не одразу.
+     * Без цієї паузи справний Shizuku виглядав би як «не запущений».
+     */
+    suspend fun awaitReady(timeoutMs: Long): Boolean {
+        val ready = withTimeoutOrNull(timeoutMs) {
+            while (refresh() != Status.READY) delay(READY_POLL_MS)
+            true
+        }
+        return ready == true
     }
 
     private fun readStatus(): Status = try {

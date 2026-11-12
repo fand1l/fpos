@@ -31,8 +31,8 @@ Android-застосунок, який через Shizuku вимикає всі 
 Потрібні JDK 17+ і Android SDK (platform 35). CI: `.github/workflows/build.yml`, запускається
 на кожен push; APK лежить в артефакті `radioguard-apk`.
 
-`MainActivitySmokeTest` запускає екран в емульованому Android (Robolectric) і ловить падіння
-на старті. Усе, що залежить від Shizuku і радіо, так не перевірити — лише вручну на телефоні
+`MainActivitySmokeTest`, `ConfirmOffTest` і `GuardWidgetTest` запускають екран і віджет
+в емульованому Android (Robolectric) і ловлять падіння на старті та помилки розмітки. Усе, що залежить від Shizuku і радіо, так не перевірити — лише вручну на телефоні
 за чеклістом розділу 10 `PLAN.md`. Не пиши «перевірено», якщо перевірено лише збірку.
 
 ## Як перевіряти команди Android
@@ -52,5 +52,7 @@ Shizuku через ADB працює як користувач shell (uid 2000), 
 - `radio/` — модель стану і перевірки (`RadioState`), читання (`RadioReader`), скрипти (`Lockdown`),
   розбір виводу shell (`ShellProbe`).
 - `guard/GuardService.kt` — цикл вартового; `guard/Notifier.kt` — сповіщення і тривога.
+- `guard/QuickState.kt` — стан і дія для плитки й віджета; `quick/` — сама плитка і віджет.
+  Вмикати режим одним дотиком можна, вимикати — лише через підтвердження в застосунку.
 - `data/Prefs.kt` — налаштування і знімок стану «до» (DataStore).
 - `ui/` — один екран на Compose.

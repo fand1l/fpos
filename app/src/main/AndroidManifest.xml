@@ -33,6 +33,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -48,6 +49,33 @@
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="Keeps device radios switched off and re-disables them when they turn on" />
         </service>
+
+        <!-- Плитку може підключити лише система: це гарантує дозвіл BIND_QUICK_SETTINGS_TILE. -->
+        <service
+            android:name=".quick.GuardTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_guard"
+            android:label="@string/guard_title"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.TOGGLEABLE_TILE"
+                android:value="true" />
+        </service>
+
+        <receiver
+            android:name=".quick.GuardWidget"
+            android:exported="false"
+            android:label="@string/guard_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/guard_widget_info" />
+        </receiver>
 
         <receiver
             android:name=".guard.BootReceiver"

@@ -23,6 +23,14 @@ object GuardState {
     private val _checks = MutableStateFlow<List<Check>?>(null)
     val checks: StateFlow<List<Check>?> = _checks.asStateFlow()
 
+    /** Служба саме вмикає режим: знімок стану, запис налаштувань. */
+    private val _enabling = MutableStateFlow(false)
+    val enabling: StateFlow<Boolean> = _enabling.asStateFlow()
+
+    fun setEnabling(value: Boolean) {
+        _enabling.value = value
+    }
+
     fun log(text: String) {
         val entry = JournalEntry(nextId.incrementAndGet(), System.currentTimeMillis(), text)
         _journal.update { (listOf(entry) + it).take(MAX_ENTRIES) }
